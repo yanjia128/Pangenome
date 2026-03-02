@@ -1,5 +1,5 @@
 {
-  "name": "django-react-typescript",
+  "name": "Pangenome",
   "version": "1.0.1",
   "private": true,
   "description": "This is an non-opinionated Django + React boilerplate built with great development experience and easy deployment in mind.",
@@ -22,14 +22,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/marcelovicentegc/django-react-typescript.git"
+    "url": "git+https://github.com/yanjia128/Pangenome.git"
   },
-  "author": "Marcelo Cardoso",
+  "author": "yanjia128",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/marcelovicentegc/django-react-typescript/issues"
+    "url": "https://github.com/yanjia128/Pangenome/issues"
   },
-  "homepage": "https://github.com/marcelovicentegc/django-react-typescript#readme",
+  "homepage": "https://github.com/yanjia128/Pangenome#readme",
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
