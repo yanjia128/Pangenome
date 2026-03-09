@@ -20,6 +20,7 @@ django-filter = "^24.2"
 django-better-admin-arrayfield = "^1.4.2"
 twilio = "^9.1.1"
 psycopg2-binary = "^2.9.9"
+pandas = "^3.0.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.4.10"

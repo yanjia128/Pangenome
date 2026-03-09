@@ -4,8 +4,9 @@ const flowbite = require("flowbite-react/tailwind");
 module.exports = {
   relative: true,
   content: [
-    "./lib/components/*.js",
-    "./lib/pages/*.js",
+    "./lib/components/*.{js,jsx,ts,tsx}",
+    "./lib/pages/*.{js,jsx,ts,tsx}",
+    "./lib/*.{js,jsx,ts,tsx}",           // 加入根目錄的 tsx
     "./templates/frontend/**/*.html",
     flowbite.content(),
   ],

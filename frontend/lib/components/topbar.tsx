@@ -11,26 +11,26 @@ export function Topbar() {
         <Navbar.Brand className="cursor-pointer" onClick={() => push("/")}>
           <img
             alt="Django + React logo"
-            src="/logo-512.png"
+            src="/orchid.png"
             className="mr-3 h-6 sm:h-9"
           />
           <span className="self-center whitespace-nowrap text-xl font-semibold dark:text-white">
-            Django + React
+            Dendrobium Pangenome
           </span>
         </Navbar.Brand>
         <Navbar.Toggle />
         <Navbar.Collapse>
           <Navbar.Link
-            onClick={() => push(ROUTES.LANDING_PAGE)}
+            onClick={() => push(ROUTES.PHYLOCANVAS)}
             className="cursor-pointer"
           >
-            Home
+            Phylogene Tree
           </Navbar.Link>
           <Navbar.Link
             className="cursor-pointer"
-            onClick={() => push(ROUTES.BLOG)}
+            onClick={() => push(ROUTES.ORTHOGROUPS)}
           >
-            Blog
+            Group
           </Navbar.Link>
         </Navbar.Collapse>
       </div>

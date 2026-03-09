@@ -10,6 +10,9 @@ from .views.publications import (
 )
 
 
+from .views.orthogroups import OrthogroupsEndpoint
+from .views.gene_trees import GeneTreeListEndpoint, GeneTreeDetailEndpoint
+
 urlpatterns = [
     re_path(r"^subscribers/$", SubscribersEndpoint.as_view()),
     re_path(r"^publications/p/$", PaginatedPublicationsEndpoint.as_view()),
@@ -17,5 +20,8 @@ urlpatterns = [
     re_path(r"^publications/p/filter/$", PaginatedPublicationsQueryEndpoint.as_view()),
     re_path(r"^publications/(?P<slug>[\w\-]+)/$", PublicationEndpoint.as_view()),
     re_path(r"^publications/$", PublicationsEndpoint.as_view()),
+    re_path(r"^orthogroups/$", OrthogroupsEndpoint.as_view()),
+    re_path(r"^gene-trees/$", GeneTreeListEndpoint.as_view()),
+    re_path(r"^gene-trees/(?P<tree_id>OG\d+)/$", GeneTreeDetailEndpoint.as_view()),
     re_path(r"^authenticate/$", obtain_auth_token),
 ]

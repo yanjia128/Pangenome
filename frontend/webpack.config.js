@@ -31,6 +31,12 @@ module.exports = {
     extensions: [".ts", ".tsx", ".mjs", ".js", ".json", ".css"],
     alias: {
       "@": path.resolve("lib"),
+      react: path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "@phylocanvas/phylocanvas.gl": path.resolve(
+        __dirname,
+        "node_modules/@phylocanvas/phylocanvas.gl/dist/bundle.min.js"
+      ),
     },
   },
   plugins: [
@@ -62,6 +68,11 @@ module.exports = {
       {
         test: /\.css$/,
         use: ["style-loader", "css-loader"],
+      },
+      {
+        test: /\.txt$/,
+        resourceQuery: /raw/,
+        type: "asset/source",
       },
       {
         enforce: "pre",

@@ -10,6 +10,9 @@ import "./index.css";
 const LandingPage = lazy(() => import("./pages/landing"));
 const BlogPage = lazy(() => import("./pages/blog"));
 const PublicationPage = lazy(() => import("./pages/publication"));
+const OrthogroupsPage = lazy(() => import("./pages/orthogroups"));
+const PhyloxoniumPage = lazy(() => import("./pages/phyloxonnium"));
+const PhylocanvasPage = lazy(() => import("./pages/phylocanvas"));
 
 dayjs.extend(LocalizedFormat);
 
@@ -40,6 +43,30 @@ export function Root() {
             element={
               <Suspense fallback={<FullScreenLoading />}>
                 <PublicationPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path={ROUTES.ORTHOGROUPS}
+            element={
+              <Suspense fallback={<FullScreenLoading />}>
+                <OrthogroupsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path={ROUTES.PHYLOCANVAS}
+            element={
+              <Suspense fallback={<FullScreenLoading />}>
+                <PhylocanvasPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path={ROUTES.PHYLOXONIUM}
+            element={
+              <Suspense fallback={<FullScreenLoading />}>
+                <PhyloxoniumPage />
               </Suspense>
             }
           />

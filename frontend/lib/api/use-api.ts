@@ -4,13 +4,16 @@ import {
   getPublicationEndpoint,
   getFilteredPublicationsEndoint,
   getPaginatedFilteredPublicationsEndoint,
+  getOrthogroupsEndpoint,
+  getGeneTreesEndpoint,
+  getGeneTreeDetailEndpoint,
 } from "./utils";
 import { getSecrets } from "../config";
 import type { GetPaginatedPublicationsResponse, Publication } from "./types";
 
 const { isProd, authToken } = getSecrets();
 
-const LOCAL_API_URL = "http://localhost:8000";
+const LOCAL_API_URL = "http://localhost:8866";
 
 export function useApi() {
   const getHeaders = new Headers({
@@ -19,31 +22,19 @@ export function useApi() {
     Authorization: "Token " + authToken,
   });
 
-  async function getPublications(
-    args: {
-      title: string;
-      tag: string[];
-    } = {
-      title: "",
-      tag: [],
-    }
-  ): Promise<Publication[]> {
+  async function getPublications(args?: {
+    title?: string;
+    tag?: string[];
+  }): Promise<Publication[]> {
     const endpoint = (() => {
-      const shouldFilter = args.tag && args.title;
-
-      if (isProd) {
-        if (shouldFilter) {
-          return getFilteredPublicationsEndoint(args);
-        }
-
-        return getPublicationsEndpoint;
+      if (args?.title || (args?.tag && args.tag.length > 0)) {
+        const filtered = getFilteredPublicationsEndoint({
+          title: args.title ?? "",
+          tag: args.tag ?? [],
+        });
+        return isProd ? filtered : LOCAL_API_URL + filtered;
       }
-
-      if (shouldFilter) {
-        return LOCAL_API_URL + getFilteredPublicationsEndoint(args);
-      }
-
-      return LOCAL_API_URL + getPublicationsEndpoint;
+      return isProd ? getPublicationsEndpoint : LOCAL_API_URL + getPublicationsEndpoint;
     })();
 
     return fetch(endpoint, {
@@ -51,10 +42,10 @@ export function useApi() {
       method: "GET",
       headers: getHeaders,
     })
-      .then((response) => response.json())
+      .then((response) => response.json() as Promise<Publication[]>)
       .catch((error) => {
         console.error(error);
-        return [];
+        return [] as Publication[];
       });
   }
 
@@ -112,10 +103,10 @@ export function useApi() {
       method: "GET",
       headers: getHeaders,
     })
-      .then((response) => response.json())
+      .then((response) => response.json() as Promise<GetPaginatedPublicationsResponse>)
       .catch((error) => {
         console.error(error);
-        return [];
+        return { count: 0, current_page: 1, total_pages: 0, next: null, previous: null, results: [] } as GetPaginatedPublicationsResponse;
       });
   }
 
@@ -130,10 +121,83 @@ export function useApi() {
         headers: getHeaders,
       }
     )
+      .then((response) => response.json() as Promise<Publication>)
+      .catch((error) => {
+        console.error(error);
+        return {} as Publication;
+      });
+  }
+
+  async function getOrthogroups(args?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+  }): Promise<{ count: number; num_pages: number; results: Record<string, unknown>[] }> {
+    const params = new URLSearchParams();
+    if (args?.page) params.set("page", args.page.toString());
+    if (args?.page_size) params.set("page_size", args.page_size.toString());
+    if (args?.search) params.set("search", args.search);
+
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const endpoint = isProd
+      ? getOrthogroupsEndpoint + query
+      : LOCAL_API_URL + getOrthogroupsEndpoint + query;
+
+    return fetch(endpoint, {
+      cache: "default",
+      method: "GET",
+      headers: getHeaders,
+    })
       .then((response) => response.json())
       .catch((error) => {
         console.error(error);
-        return [];
+        return { count: 0, num_pages: 0, results: [] as Record<string, unknown>[] };
+      });
+  }
+
+  async function getGeneTreeList(args?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+  }): Promise<{ count: number; results: { id: string; filename: string }[] }> {
+    const params = new URLSearchParams();
+    if (args?.page) params.set("page", args.page.toString());
+    if (args?.page_size) params.set("page_size", args.page_size.toString());
+    if (args?.search) params.set("search", args.search);
+
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const endpoint = isProd
+      ? getGeneTreesEndpoint + query
+      : LOCAL_API_URL + getGeneTreesEndpoint + query;
+
+    return fetch(endpoint, {
+      cache: "default",
+      method: "GET",
+      headers: getHeaders,
+    })
+      .then((response) => response.json())
+      .catch((error) => {
+        console.error(error);
+        return { count: 0, results: [] as { id: string; filename: string }[] };
+      });
+  }
+
+  async function getGeneTree(treeId: string): Promise<{ id: string; newick: string } | null> {
+    const path = getGeneTreeDetailEndpoint(treeId);
+    const endpoint = isProd ? path : LOCAL_API_URL + path;
+
+    return fetch(endpoint, {
+      cache: "default",
+      method: "GET",
+      headers: getHeaders,
+    })
+      .then((response): Promise<{ id: string; newick: string }> => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .catch((error): null => {
+        console.error(error);
+        return null;
       });
   }
 
@@ -141,5 +205,8 @@ export function useApi() {
     getPublications,
     getPaginatedPublications,
     getPublication,
+    getOrthogroups,
+    getGeneTreeList,
+    getGeneTree,
   };
 }
