@@ -12,6 +12,7 @@ from .views.publications import (
 
 from .views.orthogroups import OrthogroupsEndpoint
 from .views.gene_trees import GeneTreeListEndpoint, GeneTreeDetailEndpoint
+from .views.diff_gene_analysis import DifferentialExpressionAnalysisEndpoint
 
 urlpatterns = [
     re_path(r"^subscribers/$", SubscribersEndpoint.as_view()),
@@ -24,4 +25,5 @@ urlpatterns = [
     re_path(r"^gene-trees/$", GeneTreeListEndpoint.as_view()),
     re_path(r"^gene-trees/(?P<tree_id>OG\d+)/$", GeneTreeDetailEndpoint.as_view()),
     re_path(r"^authenticate/$", obtain_auth_token),
+    re_path(r"^differential-expression/$", DifferentialExpressionAnalysisEndpoint.as_view(), name="differential_expression"),
 ]

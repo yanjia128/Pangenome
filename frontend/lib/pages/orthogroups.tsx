@@ -39,9 +39,7 @@ function CellContent({
 }) {
   const items = parseItems(value);
 
-  if (items.length <= 3) {
-    return <span>{items.join(', ') || '-'}</span>;
-  }
+
 
   return (
     <button

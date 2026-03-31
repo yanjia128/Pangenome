@@ -5,4 +5,5 @@ export enum ROUTES {
   ORTHOGROUPS = "/orthogroups",
   PHYLOXONIUM = "/phyloxonium",
   PHYLOCANVAS = "/phylocanvas",
+  TRANSCRIPTOME = "/transcriptome",
 }

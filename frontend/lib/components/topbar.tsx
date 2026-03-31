@@ -32,7 +32,14 @@ export function Topbar() {
           >
             Group
           </Navbar.Link>
+          <Navbar.Link
+            className="cursor-pointer"
+            onClick={() => push(ROUTES.TRANSCRIPTOME)}
+          >
+            Differential Expression (DEG)
+          </Navbar.Link>
         </Navbar.Collapse>
+
       </div>
     </MegaMenu>
   );

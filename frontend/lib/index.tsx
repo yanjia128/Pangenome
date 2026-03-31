@@ -13,6 +13,7 @@ const PublicationPage = lazy(() => import("./pages/publication"));
 const OrthogroupsPage = lazy(() => import("./pages/orthogroups"));
 const PhyloxoniumPage = lazy(() => import("./pages/phyloxonnium"));
 const PhylocanvasPage = lazy(() => import("./pages/phylocanvas"));
+const TranscriptomePage = lazy(() => import("./pages/transcriptome"));
 
 dayjs.extend(LocalizedFormat);
 
@@ -67,6 +68,14 @@ export function Root() {
             element={
               <Suspense fallback={<FullScreenLoading />}>
                 <PhyloxoniumPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path={ROUTES.TRANSCRIPTOME}
+            element={
+              <Suspense fallback={<FullScreenLoading />}>
+                <TranscriptomePage />
               </Suspense>
             }
           />

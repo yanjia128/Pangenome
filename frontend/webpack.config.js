@@ -91,12 +91,16 @@ module.exports = {
     ],
   },
   devServer: {
-    watchFiles: `.${PUBLIC_PATH}`,
+    //watchFiles: `.${PUBLIC_PATH}`,
     compress: true,
     port: PORT,
     hot: true,
     open: true,
     historyApiFallback: true,
     allowedHosts: ["127.0.0.0", "localhost"],
+    static: {
+      directory: path.join(__dirname, "public/Data"),
+      watch: false, // <--- 禁用監視此資料夾，這樣更新 CSV 就不會觸發 reload
+    },
   },
 };

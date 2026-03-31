@@ -7,6 +7,7 @@ import {
   getOrthogroupsEndpoint,
   getGeneTreesEndpoint,
   getGeneTreeDetailEndpoint,
+  getDifferentialExpressionEndpoint,
 } from "./utils";
 import { getSecrets } from "../config";
 import type { GetPaginatedPublicationsResponse, Publication } from "./types";
@@ -201,6 +202,51 @@ export function useApi() {
       });
   }
 
+  async function submitDifferentialExpression(payload: {
+    species: string;
+    method: "edgeR" | "DESeq2";
+    control_samples: string[];
+    comparison_samples: string[];
+    all_columns_map: { col: string; stat: "control" | "comparison" | "unselected" }[];
+    size: string;
+  }): Promise<{
+    status?: string;
+    volcano_path?: string;
+    ma_path?: string;
+    jobID?: string;
+    cached?: boolean;
+    error?: string;
+  } | null> {
+    const mappedMethod = payload.method === "DESeq2" ? "DESeq2" : "edgeR";
+    const endpoint = isProd
+      ? getDifferentialExpressionEndpoint
+      : LOCAL_API_URL + getDifferentialExpressionEndpoint;
+
+    return fetch(endpoint, {
+      cache: "no-cache",
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(getHeaders.entries()),
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        ...payload,
+        method: mappedMethod,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          return { error: data?.error ?? `HTTP ${response.status}` };
+        }
+        return data;
+      })
+      .catch((error) => {
+        console.error(error);
+        return { error: "Differential expression request failed." };
+      });
+  }
+
   return {
     getPublications,
     getPaginatedPublications,
@@ -208,5 +254,6 @@ export function useApi() {
     getOrthogroups,
     getGeneTreeList,
     getGeneTree,
+    submitDifferentialExpression,
   };
 }

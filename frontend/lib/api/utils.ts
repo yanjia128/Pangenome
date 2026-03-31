@@ -34,6 +34,7 @@ export const getPublicationsEndpoint = "/api/publications/";
 export const getPaginatedPublicationsEndpoint = getPublicationsEndpoint + "p/";
 export const getOrthogroupsEndpoint = "/api/orthogroups/";
 export const getGeneTreesEndpoint = "/api/gene-trees/";
+export const getDifferentialExpressionEndpoint = "/api/differential-expression/";
 export function getGeneTreeDetailEndpoint(treeId: string) {
   return `/api/gene-trees/${treeId}/`;
 }

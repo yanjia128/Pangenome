@@ -36,3 +36,8 @@ coverage
 
 # Ruff
 .ruff_cache
+
+#file
+*.tsv
+*.png
+*.csv
