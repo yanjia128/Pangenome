@@ -14,6 +14,7 @@ const OrthogroupsPage = lazy(() => import("./pages/orthogroups"));
 const PhyloxoniumPage = lazy(() => import("./pages/phyloxonnium"));
 const PhylocanvasPage = lazy(() => import("./pages/phylocanvas"));
 const TranscriptomePage = lazy(() => import("./pages/transcriptome"));
+const JBrowsePage = lazy(() => import("./pages/jbrowse"));
 
 dayjs.extend(LocalizedFormat);
 
@@ -21,66 +22,86 @@ export function Root() {
   return (
     <BrowserRouter>
       <Topbar />
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <Routes>
-          <Route
-            path={ROUTES.LANDING_PAGE}
-            element={
+      <Routes>
+        <Route
+          path={ROUTES.LANDING_PAGE}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <LandingPage />
               </Suspense>
-            }
-          />
-          <Route
-            path={ROUTES.BLOG}
-            element={
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.BLOG}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <BlogPage />
               </Suspense>
-            }
-          />
-          <Route
-            path={ROUTES.PUBLICATION_PAGE}
-            element={
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.PUBLICATION_PAGE}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <PublicationPage />
               </Suspense>
-            }
-          />
-          <Route
-            path={ROUTES.ORTHOGROUPS}
-            element={
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.ORTHOGROUPS}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <OrthogroupsPage />
               </Suspense>
-            }
-          />
-          <Route
-            path={ROUTES.PHYLOCANVAS}
-            element={
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.PHYLOCANVAS}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <PhylocanvasPage />
               </Suspense>
-            }
-          />
-          <Route
-            path={ROUTES.PHYLOXONIUM}
-            element={
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.PHYLOXONIUM}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <PhyloxoniumPage />
               </Suspense>
-            }
-          />
-          <Route
-            path={ROUTES.TRANSCRIPTOME}
-            element={
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.TRANSCRIPTOME}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <TranscriptomePage />
               </Suspense>
-            }
-          />
-        </Routes>
-      </div>
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.JBROWSE}
+          element={
+            <Suspense fallback={<FullScreenLoading />}>
+              <JBrowsePage />
+            </Suspense>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

@@ -18,10 +18,14 @@ from django.contrib import admin
 from django.urls import re_path, include
 from core.settings.base import STATIC_ROOT, MEDIA_ROOT
 from django.views.static import serve
+import os
 
 admin.site.site_header = "Django-React-Typescript Admin"
 admin.site.site_title = "Django-React-Typescript Admin"
 admin.site.index_title = "Modules"
+
+# RST results directory path
+RST_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "rst")
 
 urlpatterns = [
     re_path(r"^admin/", admin.site.urls),
@@ -38,6 +42,13 @@ urlpatterns = [
         serve,
         {
             "document_root": MEDIA_ROOT,
+        },
+    ),
+    re_path(
+        r"^rst/(?P<path>.*)$",
+        serve,
+        {
+            "document_root": RST_ROOT,
         },
     ),
     re_path(r"^", include("frontend.urls")),

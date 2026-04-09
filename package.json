@@ -18,7 +18,8 @@
     "dev": "concurrently -n backend,frontend \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
     "dev:full": "concurrently -n db,backend,frontend \"pnpm run dev:db:up\" \"wait-on tcp:5432 && pnpm run dev:backend\" \"pnpm run dev:frontend\"",
     "release": "semantic-release",
-    "prepare": "husky"
+    "prepare": "husky",
+    "Jbrowse": "cd ./../JBrowse2_MultiWay && npx http-server . -p 9000 --cors -c-1 &"
   },
   "repository": {
     "type": "git",

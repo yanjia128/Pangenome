@@ -15,7 +15,7 @@ import {
   ModalHeader,
   ModalBody,
 } from "flowbite-react";
-import { HiSearch } from "react-icons/hi";
+import { HiSearch, HiDownload } from "react-icons/hi";
 
 const PAGE_SIZE = 20;
 
@@ -46,7 +46,7 @@ function CellContent({
       onClick={() => onShowMore(items, colName)}
       className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
     >
-      {items.length} 筆資料
+      {items.length} results
     </button>
   );
 }
@@ -74,7 +74,7 @@ function OrthogroupsTable() {
         setCount(resData.count);
         setNumPages(resData.num_pages);
       })
-      .catch((err) => console.error("抓取失敗:", err))
+      .catch((err) => console.error("Fetch error:", err))
       .finally(() => setLoading(false));
   }, [page, search]);
 
@@ -93,6 +93,38 @@ function OrthogroupsTable() {
     setModalOpen(true);
   };
 
+  const handleDownload = async (orthogroupId: string) => {
+    // 構建檔案路徑 - 使用絕對路徑
+    const filePath = `/rst/Results_Nov26/Orthogroup_Sequences/${orthogroupId}.fa`;
+    
+    try {
+      // 使用 fetch API 下載檔案
+      const response = await fetch(filePath);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // 獲取檔案內容
+      const blob = await response.blob();
+      
+      // 創建下載連結
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${orthogroupId}.fa`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // 清理
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('下載失敗:', error);
+      alert(`無法下載檔案 ${orthogroupId}.fa\n\n可能原因：\n1. 伺服器尚未重啟（新的 URL 配置未生效）\n2. 檔案不存在\n\n請聯繫管理員或重啟 Django 服務器。`);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -102,14 +134,14 @@ function OrthogroupsTable() {
       <div className="flex items-center gap-2 max-w-lg">
         <TextInput
           icon={HiSearch}
-          placeholder="搜尋..."
+          placeholder="Search..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           className="flex-1"
         />
         <Button color="blue" onClick={handleSearch}>
-          搜尋
+          Search
         </Button>
       </div>
 
@@ -136,12 +168,21 @@ function OrthogroupsTable() {
                       {columns.map((key, i) => (
                         <TableCell key={i}>
                           {i === 0 ? (
-                            <Link
-                              to={`/phylocanvas?id=${encodeURIComponent(String(row[key] ?? ''))}`}
-                              className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300 font-mono"
-                            >
-                              {String(row[key] ?? '')}
-                            </Link>
+                            <div className="flex items-center gap-2">
+                              <Link
+                                to={`/phylocanvas?id=${encodeURIComponent(String(row[key] ?? ''))}`}
+                                className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300 font-mono"
+                              >
+                                {String(row[key] ?? '')}
+                              </Link>
+                              <button
+                                onClick={() => handleDownload(String(row[key] ?? ''))}
+                                className="p-1 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                                title="下載 FASTA 檔案"
+                              >
+                                <HiDownload className="w-5 h-5" />
+                              </button>
+                            </div>
                           ) : (
                             <CellContent
                               value={row[key]}
@@ -181,7 +222,7 @@ function OrthogroupsTable() {
 
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-700 dark:text-gray-400">
-          共 <span className="font-semibold">{count}</span> 筆資料
+          total <span className="font-semibold">{count}</span>  results
         </span>
         <div className="flex items-center gap-2">
           <Button
@@ -189,17 +230,17 @@ function OrthogroupsTable() {
             onClick={() => setPage(page - 1)}
             disabled={page <= 1}
           >
-            上一頁
+            Last page
           </Button>
           <span className="text-sm text-gray-700 dark:text-gray-400">
-            第 <span className="font-semibold">{page}</span> 頁 / 共 <span className="font-semibold">{numPages}</span> 頁
+            Page number <span className="font-semibold">{page}</span> /total <span className="font-semibold">{numPages}</span> pages
           </span>
           <Button
             color="gray"
             onClick={() => setPage(page + 1)}
             disabled={page >= numPages}
           >
-            下一頁
+            Next page
           </Button>
         </div>
       </div>

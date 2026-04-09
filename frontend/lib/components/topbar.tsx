@@ -38,6 +38,18 @@ export function Topbar() {
           >
             Differential Expression (DEG)
           </Navbar.Link>
+          <Navbar.Link
+            className="cursor-pointer"
+            onClick={() => push(ROUTES.JBROWSE)}
+          >
+            Genome Browser
+          </Navbar.Link>
+          <Navbar.Link
+            className="cursor-pointer"
+            onClick={() => window.open('http://140.116.214.140:4568', '_blank')}
+          >
+            BLAST
+          </Navbar.Link>
         </Navbar.Collapse>
 
       </div>

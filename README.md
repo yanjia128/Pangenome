@@ -87,14 +87,14 @@ flowchart TD
 
 Below you will find the stack used for each part of the application and the features that are already implemented.
 
-| Stack      | Libraries and services                                            | Features                         |
-| ---------- | ----------------------------------------------------------------- | -------------------------------- |
-| Frontend   | React 18, React Router 6, Typescript 5, Webpack 5, Tailwind CSS 3 | Publication listing and search   |
-| Backend    | Django 5, Django Rest Framework                                   | Publication CRUD, API Key CRUD   |
-| Database   | Postgres                                                          | -                                |
-| CDN        | Cloudinary                                                        | -                                |
-| CI/CD      | GitHub Actions                                                    | Multiple deploy workflow options |
-| Monitoring | Sentry                                                            | -                                |
+| Stack      | Libraries and services                                            | Features                                               |
+| ---------- | ----------------------------------------------------------------- | ------------------------------------------------------ |
+| Frontend   | React 18, React Router 6, Typescript 5, Webpack 5, Tailwind CSS 3 | Publication listing and search, JBrowse genome browser |
+| Backend    | Django 5, Django Rest Framework                                   | Publication CRUD, API Key CRUD                         |
+| Database   | Postgres                                                          | -                                                      |
+| CDN        | Cloudinary                                                        | -                                                      |
+| CI/CD      | GitHub Actions                                                    | Multiple deploy workflow options                       |
+| Monitoring | Sentry                                                            | -                                                      |
 
 ## Going to production: infrastructure & deployment
 
@@ -219,3 +219,47 @@ flowchart TD
 React and Django are a great combination, and there are many projects out there that leverage the best of both worlds. Make sure to check them out if you're looking for a more opinionated boilerplate/different approach:
 
 - [django-react-boilerplate](https://github.com/vintasoftware/django-react-boilerplate)
+
+## JBrowse Genome Browser Integration
+
+This project includes an integrated JBrowse 2 genome browser accessible at `/jbrowse` route.
+
+### Requirements
+
+- JBrowse server running on `http://localhost:9000` (development)
+- JBrowse server must have a valid `config.json` with assemblies and tracks configuration
+
+### Configuration
+
+The JBrowse component automatically fetches configuration from the JBrowse server at startup. To modify the server URL:
+
+1. Edit `frontend/lib/pages/jbrowse.tsx`
+2. Update the `JBROWSE_SERVER_URL` constant
+3. For production, consider using environment variables via `frontend/lib/config.ts`
+
+### CORS Configuration
+
+The development environment is configured to allow requests to the JBrowse server. CORS whitelist is configured in `core/settings/dev.py`:
+
+```python
+CORS_ORIGIN_WHITELIST = [
+    "http://0.0.0.0:4000",
+    "http://localhost:4000",
+    "http://localhost:9000",  # JBrowse server
+]
+```
+
+### Usage
+
+1. Start your JBrowse server on port 9000
+2. Run the development environment: `pnpm dev` or `pnpm dev:full`
+3. Navigate to http://localhost:4000/jbrowse
+4. The genome browser will load the first assembly from your JBrowse configuration
+
+### Features
+
+- Lazy-loaded React component for optimal bundle size
+- Automatic configuration loading from JBrowse server
+- Error handling with user-friendly messages
+- Loading states during initialization
+- Responsive design integrated with site navigation

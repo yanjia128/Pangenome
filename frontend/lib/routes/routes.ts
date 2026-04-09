@@ -6,4 +6,5 @@ export enum ROUTES {
   PHYLOXONIUM = "/phyloxonium",
   PHYLOCANVAS = "/phylocanvas",
   TRANSCRIPTOME = "/transcriptome",
+  JBROWSE = "/jbrowse",
 }
