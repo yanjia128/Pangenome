@@ -109,3 +109,8 @@ declare module "@phylocanvas/phylocanvas.gl" {
     [key: string]: string;
   };
 }
+
+declare module "plotly.js-dist-min" {
+  const Plotly: unknown;
+  export default Plotly;
+}

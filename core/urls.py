@@ -25,7 +25,9 @@ admin.site.site_title = "Django-React-Typescript Admin"
 admin.site.index_title = "Modules"
 
 # RST results directory path
-RST_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "rst")
+RST_ROOT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "rst"
+)
 
 urlpatterns = [
     re_path(r"^admin/", admin.site.urls),

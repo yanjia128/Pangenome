@@ -21,6 +21,18 @@ export function Topbar() {
         <Navbar.Toggle />
         <Navbar.Collapse>
           <Navbar.Link
+            onClick={() => push(ROUTES.HOME)}
+            className="cursor-pointer"
+          >
+            Home
+          </Navbar.Link>
+          <Navbar.Link
+            onClick={() => push(ROUTES.ANALYSIS)}
+            className="cursor-pointer"
+          >
+            Analysis
+          </Navbar.Link>
+          <Navbar.Link
             onClick={() => push(ROUTES.PHYLOCANVAS)}
             className="cursor-pointer"
           >
