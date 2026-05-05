@@ -62,6 +62,12 @@ export function Topbar() {
           >
             BLAST
           </Navbar.Link>
+          <Navbar.Link
+            onClick={() => push(ROUTES.CONTACT)}
+            className="cursor-pointer"
+          >
+            Contact
+          </Navbar.Link>
         </Navbar.Collapse>
 
       </div>

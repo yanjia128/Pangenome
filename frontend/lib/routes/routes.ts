@@ -9,4 +9,5 @@ export enum ROUTES {
   PHYLOCANVAS = "/phylocanvas",
   TRANSCRIPTOME = "/transcriptome",
   JBROWSE = "/jbrowse",
+  CONTACT = "/contact",
 }

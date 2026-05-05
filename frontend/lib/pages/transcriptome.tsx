@@ -136,9 +136,22 @@ export default function TranscriptomePage() {
   const [analysisResult, setAnalysisResult] = useState<DiffResponse | null>(null);
   const [analysisError, setAnalysisError] = useState<string>("");
 
+  const getMethodBySelection = useCallback(
+    (controlCount: number, comparisonCount: number): DiffMethod =>
+      controlCount > 1 || comparisonCount > 1 ? "DESeq2" : "edgeR",
+    []
+  );
+
   useEffect(() => {
     loadTableData();
   }, [selectedSpecies]);
+
+  useEffect(() => {
+    const method = getMethodBySelection(selectedControl.length, selectedComparison.length);
+    const size = method === "DESeq2" ? Math.min(selectedControl.length, selectedComparison.length) : 0;
+    setAnalysisMethod(method);
+    setAnalysisSize(size);
+  }, [selectedControl.length, selectedComparison.length, getMethodBySelection]);
 
   const loadTableData = async () => {
     setLoading(true);
@@ -254,11 +267,14 @@ export default function TranscriptomePage() {
     }
   };
 
-  const handleMethodChange = (method: DiffMethod) => {
+  const handleMethodChange = () => {
+    const method = getMethodBySelection(selectedControl.length, selectedComparison.length);
     setAnalysisMethod(method);
     if (method === "DESeq2") {
       const size = Math.min(selectedControl.length, selectedComparison.length);
       setAnalysisSize(size);
+    } else {
+      setAnalysisSize(0);
     }
   };
 
@@ -266,7 +282,8 @@ export default function TranscriptomePage() {
     // Prevent any default behavior and stop propagation
     e?.preventDefault();
     e?.stopPropagation();
-    
+    setAnalysisError("");
+
     if (selectedControl.length === 0 || selectedComparison.length === 0) {
       alert("請至少選擇一個控制組和一個對照組樣本！");
       return;
@@ -282,7 +299,7 @@ export default function TranscriptomePage() {
       }
     });
 
-    const method = analysisMethod;
+    const method = getMethodBySelection(selectedControl.length, selectedComparison.length);
     const size = method === "DESeq2" ? Math.min(selectedControl.length, selectedComparison.length) : 0;
 
     setAnalysisMethod(method);
@@ -537,7 +554,7 @@ export default function TranscriptomePage() {
                   name="diff_method"
                   value="edgeR"
                   checked={analysisMethod === "edgeR"}
-                  onChange={() => handleMethodChange("edgeR")}
+                  onChange={handleMethodChange}
                   className="text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">edgeR</span>
@@ -548,7 +565,7 @@ export default function TranscriptomePage() {
                   name="diff_method"
                   value="DESeq2"
                   checked={analysisMethod === "DESeq2"}
-                  onChange={() => handleMethodChange("DESeq2")}
+                  onChange={handleMethodChange}
                   className="text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">DESeq2</span>

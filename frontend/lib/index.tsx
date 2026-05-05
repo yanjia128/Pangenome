@@ -17,6 +17,7 @@ const PhylocanvasPage = lazy(() => import("./pages/phylocanvas"));
 const TranscriptomePage = lazy(() => import("./pages/transcriptome"));
 const JBrowsePage = lazy(() => import("./pages/jbrowse"));
 const AnalysisPage = lazy(() => import("./pages/analsis"));
+const ContactPage = lazy(() => import("./pages/contact"));
 
 dayjs.extend(LocalizedFormat);
 
@@ -121,6 +122,16 @@ export function Root() {
             <Suspense fallback={<FullScreenLoading />}>
               <JBrowsePage />
             </Suspense>
+          }
+        />
+        <Route
+          path={ROUTES.CONTACT}
+          element={
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+              <Suspense fallback={<FullScreenLoading />}>
+                <ContactPage />
+              </Suspense>
+            </div>
           }
         />
       </Routes>

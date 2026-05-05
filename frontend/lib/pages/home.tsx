@@ -60,6 +60,179 @@ const SP_COLORS = [
   "#9EAACB",
 ];
 
+type SpeciesLink = {
+  label: string;
+  href?: string;
+  note?: string;
+  shortLabel?: string;
+};
+
+const SPECIES_POWO_LINKS: SpeciesLink[] = [
+  {
+    label: "Dendrobium aphyllum (兜唇石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:626817-1",
+    shortLabel: "D. aphylium",
+  },
+  {
+    label: "Dendrobium bullenianum (布連石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:626983-1",
+    shortLabel: "D. bullenianum",
+  },
+  {
+    label: "Dendrobium Chao Praya Smile",
+    note: "人工雜交種，POWO 無資料",
+    shortLabel: "D. Chao Praya Smile",
+  },
+  {
+    label: "Dendrobium cariniferum (翅萼石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627031-1",
+    shortLabel: "D. cariniferum",
+  },
+  {
+    label: "Dendrobium crocatum (橙黃石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627198-1",
+    shortLabel: "D. crocatum",
+  },
+  {
+    label: "Dendrobium catenatum (石斛/鐵皮石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627046-1",
+    shortLabel: "D. catenatum",
+  },
+  {
+    label: "Dendrobium crumenatum (鴿石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627202-1",
+    shortLabel: "D. crumenatum",
+  },
+  {
+    label: "Dendrobium chrysotoxum (鼓槌石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627099-1",
+    shortLabel: "D. chrysotoxum",
+  },
+  {
+    label: "Dendrobium discolor (異色石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627312-1",
+    shortLabel: "D. discolor",
+  },
+  {
+    label: "Dendrobium exile (細莖石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627394-1",
+    shortLabel: "D. exile",
+  },
+  {
+    label: "Dendrobium ellipsophyllum (月唇石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627349-1",
+    shortLabel: "D. ellipsophyllum",
+  },
+  {
+    label: "Dendrobium huoshanense (霍山石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:904013-1",
+    shortLabel: "D. huoshanense",
+  },
+  {
+    label: "Dendrobium formosum (美麗石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627462-1",
+    shortLabel: "D. formosum",
+  },
+  {
+    label: "Dendrobium lindleyi (聚石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627854-1",
+    shortLabel: "D. lindleyi",
+  },
+  {
+    label: "Dendrobium hercoglossum (紅心石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627607-1",
+    shortLabel: "D. hercoglossum",
+  },
+  {
+    label: "Dendrobium nobile (石斛蘭/金釵石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:628105-1",
+    shortLabel: "D. nobile",
+  },
+  {
+    label: "Dendrobium jenkinsii (小聚石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627723-1",
+    shortLabel: "D. jenkinsii",
+  },
+  {
+    label: "Dendrobium parcum (少花石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:628211-1",
+    shortLabel: "D. parcum",
+  },
+  {
+    label: "Dendrobium leonis (獅子石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627832-1",
+    shortLabel: "D. leonis",
+  },
+  {
+    label: "Dendrobium porphyrochilum (紫唇石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:628316-1",
+    shortLabel: "D. porphyrochilum",
+  },
+  {
+    label: "Dendrobium smilliae (叢生石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:110951-3",
+    shortLabel: "D. smilliae",
+  },
+  {
+    label: "Dendrobium secundum (報春石斛/鳥舌石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:628587-1",
+    shortLabel: "D. secundum",
+  },
+  {
+    label: "Dendrobium tetragonum (四棱石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:628757-1",
+    shortLabel: "D. tetragonum",
+  },
+  {
+    label: "Dendrobium spatella (具槽石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:628635-1",
+    shortLabel: "D. spatella",
+  },
+  {
+    label: "Dendrobium devonianum (齒瓣石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:627290-1",
+    shortLabel: "D. devonianum",
+  },
+  {
+    label: "Dendrobium thyrsiflorum (球花石斛)",
+    href: "https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:60456844-2",
+    shortLabel: "D. thyrsiflorum",
+  },
+];
+
+type PlotlyClickPoint = {
+  x?: string | number;
+  label?: string;
+  text?: string;
+};
+
+type PlotlyClickEvent = {
+  points?: PlotlyClickPoint[];
+};
+
+type PlotlyChartElement = HTMLElement & {
+  on?: (event: "plotly_click", handler: (event: PlotlyClickEvent) => void) => void;
+  removeAllListeners?: (event: "plotly_click") => void;
+};
+
+const SPECIES_LINK_BY_SHORT_LABEL = SPECIES_POWO_LINKS.reduce<Record<string, string>>(
+  (acc, item) => {
+    if (item.href && item.shortLabel) {
+      acc[item.shortLabel] = item.href;
+    }
+    return acc;
+  },
+  {}
+);
+
+function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]*>/g, "");
+}
+
+function resolveSpeciesLink(label: string): string | undefined {
+  return SPECIES_LINK_BY_SHORT_LABEL[stripHtmlTags(label).trim()];
+}
+
 const METRIC_OPTIONS: Array<{ value: SpeciesMetric; label: string }> = [
   { value: "n_genes", label: "Total genes" },
   { value: "n_in_orthogroups", label: "Genes in orthogroups" },
@@ -356,31 +529,59 @@ function HomePage() {
       .map((_: number, idx: number): number => idx)
       .sort((a: number, b: number): number => values[b] - values[a]);
 
-    void plotly.react(
-      CHART_IDS[1],
-      [
-        {
-          type: "bar",
-          x: sortedIndex.map((idx: number): string =>
-            toScientificTag(data.per_species.display[idx])
-          ),
-          y: sortedIndex.map((idx: number): number => values[idx]),
-          marker: {
-            color: sortedIndex.map(
-              (idx: number): string => SP_COLORS[idx % SP_COLORS.length]
+    void plotly
+      .react(
+        CHART_IDS[1],
+        [
+          {
+            type: "bar",
+            x: sortedIndex.map((idx: number): string =>
+              toScientificTag(data.per_species.display[idx])
             ),
+            y: sortedIndex.map((idx: number): number => values[idx]),
+            marker: {
+              color: sortedIndex.map(
+                (idx: number): string => SP_COLORS[idx % SP_COLORS.length]
+              ),
+            },
+            hovertemplate: "<b>%{x}</b>: %{y:,}<extra></extra>",
           },
-          hovertemplate: "<b>%{x}</b>: %{y:,}<extra></extra>",
+        ],
+        {
+          ...LAYOUT_BASE,
+          xaxis: { tickangle: -40 },
+          yaxis: { title: "Count", gridcolor: "#e9ecef" },
+          margin: { t: 20, r: 20, b: 100, l: 80 },
         },
-      ],
-      {
-        ...LAYOUT_BASE,
-        xaxis: { tickangle: -40 },
-        yaxis: { title: "Count", gridcolor: "#e9ecef" },
-        margin: { t: 20, r: 20, b: 100, l: 80 },
-      },
-      PLOT_CONFIG
-    );
+        PLOT_CONFIG
+      )
+      .then(() => {
+        const chartEl = document.getElementById(
+          CHART_IDS[1]
+        ) as PlotlyChartElement | null;
+        if (!chartEl?.on) {
+          return;
+        }
+        chartEl.removeAllListeners?.("plotly_click");
+        chartEl.on("plotly_click", (event: PlotlyClickEvent) => {
+          const point = event.points?.[0];
+          const rawLabel =
+            typeof point?.x === "string"
+              ? point.x
+              : typeof point?.label === "string"
+              ? point.label
+              : typeof point?.text === "string"
+              ? point.text
+              : null;
+          if (!rawLabel) {
+            return;
+          }
+          const link = resolveSpeciesLink(rawLabel);
+          if (link) {
+            window.open(link, "_blank", "noopener,noreferrer");
+          }
+        });
+      });
   }, [data, metric, plotly]);
 
   const stats = useMemo(() => {
@@ -481,6 +682,33 @@ function HomePage() {
         <div className="pa-card-body">
           <div id={CHART_IDS[1]} className="pa-chart-tall" />
           <div className="pa-desc">{METRIC_DESC[metric]}</div>
+          <div className="mt-4">
+            <div className="mb-2 text-sm font-semibold text-gray-700">
+              POWO species links
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {SPECIES_POWO_LINKS.map((item) =>
+                item.href ? (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-blue-700 hover:underline"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <div key={item.label} className="text-sm text-gray-700">
+                    {item.label}
+                    {item.note ? (
+                      <span className="ml-1 text-gray-500">({item.note})</span>
+                    ) : null}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
