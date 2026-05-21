@@ -41,3 +41,9 @@ coverage
 *.tsv
 *.png
 *.csv
+
+#frontend/data
+frontend/public/Data
+
+#logs/
+logs/

@@ -12,9 +12,7 @@ import {
 import { getSecrets } from "../config";
 import type { GetPaginatedPublicationsResponse, Publication } from "./types";
 
-const { isProd, authToken } = getSecrets();
-
-const LOCAL_API_URL = "http://localhost:8866";
+const { isProd, authToken, apiBaseUrl } = getSecrets();
 
 export function useApi() {
   const getHeaders = new Headers({
@@ -33,9 +31,9 @@ export function useApi() {
           title: args.title ?? "",
           tag: args.tag ?? [],
         });
-        return isProd ? filtered : LOCAL_API_URL + filtered;
+        return isProd ? filtered : apiBaseUrl + filtered;
       }
-      return isProd ? getPublicationsEndpoint : LOCAL_API_URL + getPublicationsEndpoint;
+      return isProd ? getPublicationsEndpoint : apiBaseUrl + getPublicationsEndpoint;
     })();
 
     return fetch(endpoint, {
@@ -64,7 +62,7 @@ export function useApi() {
           return getPaginatedPublicationsEndpoint;
         }
 
-        return LOCAL_API_URL + getPaginatedPublicationsEndpoint;
+        return apiBaseUrl + getPaginatedPublicationsEndpoint;
       }
 
       if (args.querystring) {
@@ -77,7 +75,7 @@ export function useApi() {
         }
 
         return (
-          LOCAL_API_URL +
+          apiBaseUrl +
           getPaginatedPublicationsEndpoint +
           `?page=${args.page}`
         );
@@ -90,7 +88,7 @@ export function useApi() {
         }
 
         return (
-          LOCAL_API_URL +
+          apiBaseUrl +
           getPaginatedFilteredPublicationsEndoint({
             title: args.filter.title,
             tag: args.filter.tags,
@@ -115,7 +113,7 @@ export function useApi() {
     return fetch(
       isProd
         ? getPublicationEndpoint(slug)
-        : LOCAL_API_URL + getPublicationEndpoint(slug),
+        : apiBaseUrl + getPublicationEndpoint(slug),
       {
         cache: "default",
         method: "GET",
@@ -142,7 +140,7 @@ export function useApi() {
     const query = params.toString() ? `?${params.toString()}` : "";
     const endpoint = isProd
       ? getOrthogroupsEndpoint + query
-      : LOCAL_API_URL + getOrthogroupsEndpoint + query;
+      : apiBaseUrl + getOrthogroupsEndpoint + query;
 
     return fetch(endpoint, {
       cache: "default",
@@ -169,7 +167,7 @@ export function useApi() {
     const query = params.toString() ? `?${params.toString()}` : "";
     const endpoint = isProd
       ? getGeneTreesEndpoint + query
-      : LOCAL_API_URL + getGeneTreesEndpoint + query;
+      : apiBaseUrl + getGeneTreesEndpoint + query;
 
     return fetch(endpoint, {
       cache: "default",
@@ -185,7 +183,7 @@ export function useApi() {
 
   async function getGeneTree(treeId: string): Promise<{ id: string; newick: string } | null> {
     const path = getGeneTreeDetailEndpoint(treeId);
-    const endpoint = isProd ? path : LOCAL_API_URL + path;
+    const endpoint = isProd ? path : apiBaseUrl + path;
 
     return fetch(endpoint, {
       cache: "default",
@@ -220,7 +218,7 @@ export function useApi() {
     const mappedMethod = payload.method === "DESeq2" ? "DESeq2" : "edgeR";
     const endpoint = isProd
       ? getDifferentialExpressionEndpoint
-      : LOCAL_API_URL + getDifferentialExpressionEndpoint;
+      : apiBaseUrl + getDifferentialExpressionEndpoint;
 
     return fetch(endpoint, {
       cache: "no-cache",

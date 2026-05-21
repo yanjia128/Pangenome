@@ -28,10 +28,18 @@ admin.site.index_title = "Modules"
 RST_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "rst"
 )
+JBROWSE_ROOT = os.environ.get(
+    "JBROWSE_DIR",
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "..",
+        "JBrowse2_MultiWay",
+    ),
+)
 
 urlpatterns = [
     re_path(r"^admin/", admin.site.urls),
-    re_path(r"^api/", include("api.urls")),
+    re_path(r"^dendrobium/api/", include("api.urls")),
     re_path(
         r"^static/(?P<path>.*)$",
         serve,
@@ -51,6 +59,21 @@ urlpatterns = [
         serve,
         {
             "document_root": RST_ROOT,
+        },
+    ),
+    re_path(
+        r"^dendrobium/SyntneyViewer/$",
+        serve,
+        {
+            "path": "index.html",
+            "document_root": JBROWSE_ROOT,
+        },
+    ),
+    re_path(
+        r"^dendrobium/SyntneyViewer/(?P<path>.*)$",
+        serve,
+        {
+            "document_root": JBROWSE_ROOT,
         },
     ),
     re_path(r"^", include("frontend.urls")),

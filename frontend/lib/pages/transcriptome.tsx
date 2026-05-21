@@ -9,17 +9,19 @@ import {
   TableRow,
   TextInput,
   Button,
-  Spinner
+  Spinner,
 } from "flowbite-react";
 import { HiSearch, HiChevronUp, HiChevronDown } from "react-icons/hi";
-//需要新增tpkm表現量
+
 type SpeciesOption = {
   label: string;
-  tsvPath: string;
+  countsTsvPath: string;
+  tpmTsvPath: string;
   backendSpecies: string;
 };
 
 type DiffMethod = "edgeR" | "DESeq2";
+type ExpressionTableMode = "counts" | "tpm";
 
 type ColumnStatus = {
   col: string;
@@ -34,46 +36,63 @@ type DiffResponse = {
   cached?: boolean;
   error?: string;
 };
-//現有物種清單
+
+type HeatmapData = {
+  genes: string[];
+  samples: string[];
+  values: number[][];
+  rawValues: number[][];
+  min: number;
+  max: number;
+};
+
 const SPECIES_OPTIONS: SpeciesOption[] = [
   {
     label: "D. bullen",
-    tsvPath: "/table/Dbullen_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dbullen_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dbullen_tpm.tsv",
     backendSpecies: "Dbullen",
   },
   {
     label: "D. carini",
-    tsvPath: "/table/Dcarini_counts.tsv",
-    backendSpecies: "Dcarini",
+    countsTsvPath: "/dendrobium/table/Dcar_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dcar_tpm.tsv",
+    backendSpecies: "Dcar",
   },
   {
     label: "D. exile",
-    tsvPath: "/table/Dexile_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dexile_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dexile_tpm.tsv",
     backendSpecies: "Dexile",
   },
   {
     label: "D. lindle",
-    tsvPath: "/table/Dlindle_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dlindle_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dlindle_tpm.tsv",
     backendSpecies: "Dlindle",
   },
   {
     label: "D. nobile",
-    tsvPath: "/table/Dnobile_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dnobile_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dnobile_tpm.tsv",
     backendSpecies: "Dnobile",
   },
   {
     label: "D. parcum",
-    tsvPath: "/table/Dparcum_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dparcum_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dparcum_tpm.tsv",
     backendSpecies: "Dparcum",
   },
   {
     label: "D. porphy",
-    tsvPath: "/table/Dporphy_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dporphy_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dporphy_tpm.tsv",
     backendSpecies: "Dporphy",
   },
   {
     label: "D. secund",
-    tsvPath: "/table/Dsecund_counts.tsv",
+    countsTsvPath: "/dendrobium/table/Dsecund_counts.tsv",
+    tpmTsvPath: "/dendrobium/table/Dsecund_tpm.tsv",
     backendSpecies: "Dsecund",
   },
 ];
@@ -106,17 +125,151 @@ function withCacheBuster(url: string): string {
   return `${url}?_t=${timestamp}`;
 }
 
+function buildTpmHeatmapData(
+  headers: string[],
+  rows: Record<string, string>[],
+  maxGenes = 100
+): HeatmapData | null {
+  if (headers.length < 2 || rows.length === 0) {
+    return null;
+  }
+
+  const geneColumn = headers[0];
+  const sampleColumns = headers.slice(1);
+  if (sampleColumns.length === 0) {
+    return null;
+  }
+
+  const scoredRows = rows
+    .map((row) => {
+      const rawValues = sampleColumns.map((sample) => {
+        const numericValue = Number.parseFloat(row[sample] ?? "");
+        return Number.isFinite(numericValue) ? numericValue : 0;
+      });
+      const mean = rawValues.reduce((sum, value) => sum + value, 0) / rawValues.length;
+      const variance =
+        rawValues.reduce((sum, value) => sum + (value - mean) ** 2, 0) / rawValues.length;
+
+      return {
+        gene: row[geneColumn] || "",
+        rawValues,
+        variance,
+      };
+    })
+    .filter((row) => row.gene.length > 0);
+
+  if (scoredRows.length === 0) {
+    return null;
+  }
+
+  const selectedRows = scoredRows
+    .sort((a, b) => b.variance - a.variance)
+    .slice(0, maxGenes)
+    .sort((a, b) => b.variance - a.variance);
+
+  const values = selectedRows.map((row) => row.rawValues.map((value) => Math.log2(value + 1)));
+  const flattened = values.flat();
+  const min = flattened.length > 0 ? Math.min(...flattened) : 0;
+  const max = flattened.length > 0 ? Math.max(...flattened) : 0;
+
+  return {
+    genes: selectedRows.map((row) => row.gene),
+    samples: sampleColumns,
+    rawValues: selectedRows.map((row) => row.rawValues),
+    values,
+    min,
+    max,
+  };
+}
+
+function getHeatmapColor(value: number, min: number, max: number): string {
+  if (max <= min) {
+    return "rgb(254, 243, 199)";
+  }
+
+  const ratio = Math.min(1, Math.max(0, (value - min) / (max - min)));
+  const hue = 48 - ratio * 42;
+  const saturation = 95 - ratio * 8;
+  const lightness = 94 - ratio * 48;
+  return `hsl(${hue.toFixed(1)} ${saturation.toFixed(1)}% ${lightness.toFixed(1)}%)`;
+}
+
+function ReactTpmHeatmap({ data }: { data: HeatmapData }) {
+  return (
+    <div className="space-y-4">
+      <div className="overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+        <div
+          className="grid min-w-max"
+          style={{
+            gridTemplateColumns: `220px repeat(${data.samples.length}, minmax(44px, 1fr))`,
+          }}
+        >
+          <div className="sticky left-0 top-0 z-20 border-b border-r border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            Gene / Sample
+          </div>
+          {data.samples.map((sample) => (
+            <div
+              key={sample}
+              className="sticky top-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-2 text-center text-[11px] font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              style={{ writingMode: "vertical-rl", textOrientation: "mixed", minHeight: "120px" }}
+              title={sample}
+            >
+              {sample}
+            </div>
+          ))}
+
+          {data.genes.map((gene, rowIndex) => (
+            <React.Fragment key={gene}>
+              <div
+                className="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                title={gene}
+              >
+                {gene}
+              </div>
+              {data.values[rowIndex].map((value, colIndex) => {
+                const rawValue = data.rawValues[rowIndex][colIndex];
+                return (
+                  <div
+                    key={`${gene}-${data.samples[colIndex]}`}
+                    className="border-b border-r border-white/50"
+                    style={{
+                      backgroundColor: getHeatmapColor(value, data.min, data.max),
+                      width: "44px",
+                      height: "28px",
+                    }}
+                    title={`${gene}\n${data.samples[colIndex]}\nTPM: ${rawValue.toFixed(2)}\nlog2(TPM + 1): ${value.toFixed(2)}`}
+                  />
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-300">
+        <span className="font-medium">log2(TPM + 1)</span>
+        <span>{data.min.toFixed(2)}</span>
+        <div
+          className="h-3 w-40 rounded-full border border-gray-200 dark:border-gray-700"
+          style={{ background: "linear-gradient(90deg, hsl(48 95% 94%), hsl(6 87% 46%))" }}
+        />
+        <span>{data.max.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function TranscriptomePage() {
   const { submitDifferentialExpression } = useApi();
 
   const [selectedSpecies, setSelectedSpecies] = useState<SpeciesOption>(SPECIES_OPTIONS[0]);
+  const [tableMode, setTableMode] = useState<ExpressionTableMode>("counts");
   const [loading, setLoading] = useState(false);
   const [tableData, setTableData] = useState<{ headers: string[]; rows: Record<string, string>[] }>({
     headers: [],
     rows: [],
   });
 
-  // Table state management
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [searchTerm, setSearchTerm] = useState("");
@@ -143,8 +296,8 @@ export default function TranscriptomePage() {
   );
 
   useEffect(() => {
-    loadTableData();
-  }, [selectedSpecies]);
+    void loadTableData();
+  }, [selectedSpecies, tableMode]);
 
   useEffect(() => {
     const method = getMethodBySelection(selectedControl.length, selectedComparison.length);
@@ -166,18 +319,23 @@ export default function TranscriptomePage() {
     setSortConfig(null);
 
     try {
-      const response = await fetch(selectedSpecies.tsvPath);
+      const selectedPath =
+        tableMode === "counts" ? selectedSpecies.countsTsvPath : selectedSpecies.tpmTsvPath;
+
+      const response = await fetch(selectedPath);
       const text = await response.text();
       const { headers, rows } = parseTsv(text);
       setTableData({ headers, rows });
 
-      const sampleColumns = headers.slice(2);
-      const statuses: ColumnStatus[] = sampleColumns.map((col) => ({
-        col,
-        stat: "unselected",
-      }));
-      setColumnStatuses(statuses);
-      setShowDiffAnalysis(true);
+      if (tableMode === "counts") {
+        const sampleColumns = headers.slice(1);
+        const statuses: ColumnStatus[] = sampleColumns.map((col) => ({
+          col,
+          stat: "unselected",
+        }));
+        setColumnStatuses(statuses);
+        setShowDiffAnalysis(true);
+      }
     } catch (error) {
       console.error("Failed to load TSV data:", error);
     } finally {
@@ -185,7 +343,6 @@ export default function TranscriptomePage() {
     }
   };
 
-  // Search and filter logic
   const filteredData = useMemo(() => {
     if (!searchTerm) return tableData.rows;
 
@@ -196,7 +353,6 @@ export default function TranscriptomePage() {
     });
   }, [tableData.rows, searchTerm]);
 
-  // Sorting logic
   const sortedData = useMemo(() => {
     if (!sortConfig) return filteredData;
 
@@ -204,7 +360,6 @@ export default function TranscriptomePage() {
       const aVal = a[sortConfig.key];
       const bVal = b[sortConfig.key];
 
-      // Try to parse as numbers for numeric sorting
       const aNum = parseFloat(aVal);
       const bNum = parseFloat(bVal);
 
@@ -212,7 +367,6 @@ export default function TranscriptomePage() {
         return sortConfig.direction === "asc" ? aNum - bNum : bNum - aNum;
       }
 
-      // String sorting
       if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
@@ -221,7 +375,6 @@ export default function TranscriptomePage() {
     return sorted;
   }, [filteredData, sortConfig]);
 
-  // Pagination logic
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return sortedData.slice(startIndex, startIndex + pageSize);
@@ -230,6 +383,18 @@ export default function TranscriptomePage() {
   const totalPages = Math.ceil(sortedData.length / pageSize);
   const startRecord = sortedData.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, sortedData.length);
+  const currentTablePath =
+    tableMode === "counts" ? selectedSpecies.countsTsvPath : selectedSpecies.tpmTsvPath;
+  const currentTableFileName =
+    currentTablePath.split("/").pop() ?? selectedSpecies.backendSpecies + "_" + tableMode + ".tsv";
+
+  const tpmHeatmapData = useMemo(() => {
+    if (tableMode !== "tpm") {
+      return null;
+    }
+
+    return buildTpmHeatmapData(tableData.headers, filteredData);
+  }, [filteredData, tableData.headers, tableMode]);
 
   const handleSort = (columnKey: string) => {
     setSortConfig((current) => {
@@ -241,12 +406,21 @@ export default function TranscriptomePage() {
       }
       return { key: columnKey, direction: "asc" };
     });
-    setCurrentPage(1); // Reset to first page when sorting
+    setCurrentPage(1);
   };
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
+  };
+
+  const handleDownloadTable = () => {
+    const link = document.createElement("a");
+    link.href = currentTablePath;
+    link.download = currentTableFileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleControlCheckbox = (col: string, checked: boolean) => {
@@ -279,7 +453,6 @@ export default function TranscriptomePage() {
   };
 
   const handleRunAnalysis = async (e?: React.MouseEvent<HTMLButtonElement>) => {
-    // Prevent any default behavior and stop propagation
     e?.preventDefault();
     e?.stopPropagation();
     setAnalysisError("");
@@ -292,11 +465,11 @@ export default function TranscriptomePage() {
     const allColumnsMap: ColumnStatus[] = columnStatuses.map((cs) => {
       if (selectedControl.includes(cs.col)) {
         return { ...cs, stat: "control" };
-      } else if (selectedComparison.includes(cs.col)) {
-        return { ...cs, stat: "comparison" };
-      } else {
-        return { ...cs, stat: "unselected" };
       }
+      if (selectedComparison.includes(cs.col)) {
+        return { ...cs, stat: "comparison" };
+      }
+      return { ...cs, stat: "unselected" };
     });
 
     const method = getMethodBySelection(selectedControl.length, selectedComparison.length);
@@ -304,7 +477,7 @@ export default function TranscriptomePage() {
 
     setAnalysisMethod(method);
     setAnalysisSize(size);
-    setAnalysisResult(null); // 清空之前的分析結果圖片
+    setAnalysisResult(null);
     setRunningAnalysis(true);
 
     try {
@@ -330,14 +503,15 @@ export default function TranscriptomePage() {
   };
 
   return (
-      <div className="space-y-6">
+    <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Transcriptome Analysis</h2>
 
-      {/* Species Selection and Table Display Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Whole Gene Expression</h3>
-        
-        <div className="mb-4 flex gap-4 items-end">
+        <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+          Whole Gene Expression ({tableMode === "counts" ? "Counts" : "TPM"})
+        </h3>
+
+        <div className="mb-4 flex flex-wrap gap-4 items-end">
           <div className="flex-shrink-0">
             <label htmlFor="species-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Library:
@@ -359,6 +533,21 @@ export default function TranscriptomePage() {
             </select>
           </div>
 
+          <div className="flex-shrink-0">
+            <label htmlFor="table-mode-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Data Type:
+            </label>
+            <select
+              id="table-mode-select"
+              className="block w-56 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              value={tableMode}
+              onChange={(e) => setTableMode(e.target.value as ExpressionTableMode)}
+            >
+              <option value="counts">Read Counts（可做差異分析）</option>
+              <option value="tpm">TPM（僅供瀏覽）</option>
+            </select>
+          </div>
+
           <div className="flex-grow">
             <label htmlFor="table-search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Search:
@@ -371,12 +560,23 @@ export default function TranscriptomePage() {
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   e.preventDefault();
                 }
               }}
               className="max-w-md"
             />
+          </div>
+
+          <div className="flex-shrink-0">
+            <Button
+              type="button"
+              color="light"
+              onClick={handleDownloadTable}
+              disabled={loading || tableData.headers.length === 0}
+            >
+              Download Table
+            </Button>
           </div>
         </div>
 
@@ -384,6 +584,18 @@ export default function TranscriptomePage() {
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600 dark:text-gray-400">Loading data...</p>
+          </div>
+        )}
+
+        {!loading && tableMode === "tpm" && tpmHeatmapData && (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+            <div className="mb-3">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">TPM Heatmap (React)</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                依目前搜尋結果挑選變異最高的前 {tpmHeatmapData.genes.length} 個基因，並以 React grid 顯示 log2(TPM + 1)。
+              </p>
+            </div>
+            <ReactTpmHeatmap data={tpmHeatmapData} />
           </div>
         )}
 
@@ -400,13 +612,12 @@ export default function TranscriptomePage() {
                     >
                       <div className="flex items-center gap-1">
                         <span>{header}</span>
-                        {sortConfig?.key === header && (
-                          sortConfig.direction === "asc" ? (
+                        {sortConfig?.key === header &&
+                          (sortConfig.direction === "asc" ? (
                             <HiChevronUp className="w-4 h-4" />
                           ) : (
                             <HiChevronDown className="w-4 h-4" />
-                          )
-                        )}
+                          ))}
                       </div>
                     </TableHeadCell>
                   ))}
@@ -423,7 +634,6 @@ export default function TranscriptomePage() {
               </Table>
             </div>
 
-            {/* Pagination Controls */}
             <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
               <div className="text-sm text-gray-700 dark:text-gray-300">
                 Showing {startRecord} to {endRecord} of {sortedData.length} entries
@@ -493,9 +703,14 @@ export default function TranscriptomePage() {
             </div>
           </div>
         )}
+
+        {!loading && tableMode === "tpm" && (
+          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-200 rounded-md text-sm">
+            目前顯示 TPM 表格（僅供瀏覽），不提供差異表達分析。
+          </div>
+        )}
       </div>
 
-      {/* Differential Expression Analysis Section */}
       {showDiffAnalysis && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
@@ -503,10 +718,9 @@ export default function TranscriptomePage() {
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {/* Control Group */}
             <div>
               <h4 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">控制組 (Control Group)</h4>
-              <div className="border border-gray-200 dark:border-gray-600 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
+              <div className="border border-gray-200 dark:border-gray-6Heatmap00 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
                 <div className="grid grid-cols-2 gap-2">
                   {columnStatuses.map((cs) => (
                     <label key={cs.col} className="flex items-center space-x-2 cursor-pointer">
@@ -523,7 +737,6 @@ export default function TranscriptomePage() {
               </div>
             </div>
 
-            {/* Comparison Group */}
             <div>
               <h4 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">對照組 (Comparison Group)</h4>
               <div className="border border-gray-200 dark:border-gray-600 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
@@ -544,7 +757,6 @@ export default function TranscriptomePage() {
             </div>
           </div>
 
-          {/* Method Selection */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Method:</label>
             <div className="flex space-x-4">
@@ -573,7 +785,6 @@ export default function TranscriptomePage() {
             </div>
           </div>
 
-          {/* DESeq2 Size Input */}
           {analysisMethod === "DESeq2" && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -588,11 +799,10 @@ export default function TranscriptomePage() {
             </div>
           )}
 
-          {/* Run Analysis Button */}
           <Button
             type="button"
             onClick={(e) => {
-              e.preventDefault(); // 在 inline 層級先攔截一次
+              e.preventDefault();
               handleRunAnalysis(e);
             }}
             disabled={
@@ -600,14 +810,13 @@ export default function TranscriptomePage() {
               selectedControl.length === 0 ||
               selectedComparison.length === 0
             }
-            isProcessing={runningAnalysis} // 當為 true 時，按鈕會顯示載入動畫
-            processingSpinner={<Spinner size="sm" />} // 可自定義 Spinner
+            isProcessing={runningAnalysis}
+            processingSpinner={<Spinner size="sm" />}
             color="blue"
           >
             {runningAnalysis ? "Running Analysis..." : "Run Analysis"}
           </Button>
 
-          {/* Current Analysis Setup Display */}
           {(selectedControl.length > 0 || selectedComparison.length > 0) && (
             <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
               <h5 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Current Analysis Setup</h5>
@@ -628,7 +837,6 @@ export default function TranscriptomePage() {
             </div>
           )}
 
-          {/* Error Display */}
           {analysisError && (
             <div className="mt-6 p-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded-md">
               <strong>錯誤：</strong> {analysisError}
@@ -637,7 +845,6 @@ export default function TranscriptomePage() {
         </div>
       )}
 
-      {/* Analysis Result Display */}
       {(analysisResult || runningAnalysis) && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Analysis Result</h3>
@@ -658,7 +865,6 @@ export default function TranscriptomePage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Volcano Plot */}
                 {analysisResult.volcano_path && (
                   <div>
                     <h5 className="text-center text-lg font-medium mb-2 text-gray-900 dark:text-white">Volcano Plot</h5>
@@ -670,7 +876,6 @@ export default function TranscriptomePage() {
                   </div>
                 )}
 
-                {/* MA Plot */}
                 {analysisResult.ma_path && (
                   <div>
                     <h5 className="text-center text-lg font-medium mb-2 text-gray-900 dark:text-white">MA Plot</h5>

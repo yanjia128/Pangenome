@@ -181,18 +181,10 @@ export default function AnnotationPage() {
               <div className="mt-1 text-lg font-semibold text-gray-900">{selectedLabel}</div>
             </div>
             <div className="rounded-2xl border border-white/80 bg-white/70 p-3 backdrop-blur">
-              <div className="text-xs uppercase tracking-wide text-gray-500">Columns</div>
-              <div className="mt-1 text-lg font-semibold text-gray-900">{headers.length}</div>
-            </div>
-            <div className="rounded-2xl border border-white/80 bg-white/70 p-3 backdrop-blur">
               <div className="text-xs uppercase tracking-wide text-gray-500">Rows</div>
               <div className="mt-1 text-lg font-semibold text-gray-900">
                 {tableData?.rows.length ?? 0}
               </div>
-            </div>
-            <div className="rounded-2xl border border-white/80 bg-white/70 p-3 backdrop-blur">
-              <div className="text-xs uppercase tracking-wide text-gray-500">Filled Cells</div>
-              <div className="mt-1 text-lg font-semibold text-gray-900">{populatedCells}</div>
             </div>
           </div>
         </div>
@@ -225,20 +217,12 @@ export default function AnnotationPage() {
             {tableData && (
               <div className="mt-4 grid gap-2 text-xs">
                 <div className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2">
-                  <span className="text-gray-500">Annotation columns</span>
-                  <span className="font-semibold text-gray-900">{headers.length}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2">
                   <span className="text-gray-500">Total genes</span>
                   <span className="font-semibold text-gray-900">{tableData.rows.length}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2">
                   <span className="text-gray-500">Search matches</span>
                   <span className="font-semibold text-gray-900">{filteredRows.length}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2">
-                  <span className="text-gray-500">Metadata density</span>
-                  <span className="font-semibold text-gray-900">{populatedCells}</span>
                 </div>
               </div>
             )}

@@ -22,6 +22,10 @@ STATIC_DIR = os.path.join(PROJECT_ROOT, "frontend", "public", "Data", "DGA")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
+def _is_non_empty_file(path):
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+
 class DESEQ2Runner:
     def __init__(self, species, status_list, size):
         print("Start DESEQ2Runner")
@@ -49,11 +53,17 @@ class DESEQ2Runner:
         """.format(self=self, conda_bin=conda_bin, script_path=deseq2_script_path)
         subprocess.run(R_script, shell=True, check=True)
         print("DESeq2 分析完成，總耗時: %.2f 秒" % (time.time() - start))
+        volcano_file = os.path.join(
+            self.output_path, f"{self.species}_DESeq2_Volcano.png"
+        )
+        ma_file = os.path.join(self.output_path, f"{self.species}_DESeq2_MA.png")
+        if not _is_non_empty_file(volcano_file) or not _is_non_empty_file(ma_file):
+            raise RuntimeError("DESeq2 output images are missing or empty.")
         return {
-            "volcano_path": "/Data/DGA/{0}/{1}/{2}_DESeq2_MA.png".format(
+            "volcano_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_DESeq2_Volcano.png".format(
                 self.species, self.job_id, self.species
             ),
-            "ma_path": "/Data/DGA/{0}/{1}/{2}_DESeq2_Volcano.png".format(
+            "ma_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_DESeq2_MA.png".format(
                 self.species, self.job_id, self.species
             ),
         }
@@ -68,9 +78,9 @@ class DESEQ2Runner:
         volcano_file = os.path.join(self.output_path, volcano_name)
         ma_file = os.path.join(self.output_path, ma_name)
 
-        if os.path.exists(volcano_file) and os.path.exists(ma_file):
+        if _is_non_empty_file(volcano_file) and _is_non_empty_file(ma_file):
             # 構建網址路徑 (用於回傳前端)
-            url_base = "/Data/DGA/{0}/{1}".format(self.species, self.job_id)
+            url_base = "/dendrobium/Data/DGA/{0}/{1}".format(self.species, self.job_id)
             return {
                 "exists": True,
                 "volcano_path": "{0}/{1}".format(url_base, volcano_name),
@@ -108,11 +118,17 @@ class EDGERRunner:
         """.format(self=self, conda_bin=conda_bin, script_path=edge_r_script_path)
         subprocess.run(R_script, shell=True, check=True)
         print("edgeR 分析完成，總耗時: %.2f 秒" % (time.time() - start))
+        volcano_file = os.path.join(
+            self.output_path, f"{self.species}_edgeR_Volcano.png"
+        )
+        ma_file = os.path.join(self.output_path, f"{self.species}_edgeR_MA.png")
+        if not _is_non_empty_file(volcano_file) or not _is_non_empty_file(ma_file):
+            raise RuntimeError("edgeR output images are missing or empty.")
         return {
-            "volcano_path": "/Data/DGA/{0}/{1}/{2}_edgeR_Volcano.png".format(
+            "volcano_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_edgeR_Volcano.png".format(
                 self.species, self.job_id, self.species
             ),
-            "ma_path": "/Data/DGA/{0}/{1}/{2}_edgeR_MA.png".format(
+            "ma_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_edgeR_MA.png".format(
                 self.species, self.job_id, self.species
             ),
         }
@@ -127,9 +143,9 @@ class EDGERRunner:
         volcano_file = os.path.join(self.output_path, volcano_name)
         ma_file = os.path.join(self.output_path, ma_name)
 
-        if os.path.exists(volcano_file) and os.path.exists(ma_file):
+        if _is_non_empty_file(volcano_file) and _is_non_empty_file(ma_file):
             # 構建網址路徑 (用於回傳前端)
-            url_base = "/Data/DGA/{0}/{1}".format(self.species, self.job_id)
+            url_base = "/dendrobium/Data/DGA/{0}/{1}".format(self.species, self.job_id)
             return {
                 "exists": True,
                 "volcano_path": "{0}/{1}".format(url_base, volcano_name),

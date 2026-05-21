@@ -6,10 +6,14 @@ const CopyWebpackPlugin = require("copy-webpack-plugin");
 const Dotenv = require("dotenv-webpack");
 
 const PUBLIC_PATH = "/static/frontend/";
+const DEV_PREFIX = "/dendrobium";
 
 const PORT = 4000;
 
 const PRODUCTION_MODE = process.env.NODE_ENV === "production";
+const copyPatterns = PRODUCTION_MODE
+  ? [{ from: "public" }]
+  : [{ from: "public", ignore: ["**/Data/**"] }];
 
 if (!PRODUCTION_MODE) {
   console.log(
@@ -24,7 +28,7 @@ module.exports = {
   output: {
     filename: "index.js",
     path: path.resolve(__dirname, PUBLIC_PATH.replace("/", "")),
-    publicPath: PRODUCTION_MODE ? PUBLIC_PATH : "/",
+    publicPath: PRODUCTION_MODE ? PUBLIC_PATH : "auto",
   },
   devtool: "source-map",
   resolve: {
@@ -49,8 +53,9 @@ module.exports = {
         "index.html"
       ),
       filename: "index.html",
+      inject: PRODUCTION_MODE,
     }),
-    new CopyWebpackPlugin([{ from: "public" }]),
+    new CopyWebpackPlugin(copyPatterns),
     new webpack.HotModuleReplacementPlugin(),
     new webpack.optimize.AggressiveMergingPlugin(),
     new Dotenv(),
@@ -96,11 +101,46 @@ module.exports = {
     port: PORT,
     hot: true,
     open: true,
-    historyApiFallback: true,
-    allowedHosts: ["127.0.0.0", "localhost"],
-    static: {
-      directory: path.join(__dirname, "public/Data"),
-      watch: false, // <--- 禁用監視此資料夾，這樣更新 CSV 就不會觸發 reload
+    historyApiFallback: {
+      rewrites: [
+        { from: /^\/dendrobium(?:\/.*)?$/, to: "/index.html" },
+        { from: /./, to: "/index.html" },
+      ],
     },
+    allowedHosts: "all",
+    setupMiddlewares: (middlewares, devServer) => {
+      if (!devServer) {
+        return middlewares;
+      }
+
+      devServer.app.use((req, _res, next) => {
+        if (!req.url) {
+          next();
+          return;
+        }
+
+        if (
+          req.url === `${DEV_PREFIX}/Data` ||
+          req.url.startsWith(`${DEV_PREFIX}/Data/`)
+        ) {
+          next();
+          return;
+        }
+
+        if (req.url.startsWith(`${DEV_PREFIX}/`)) {
+          req.url = req.url.slice(DEV_PREFIX.length) || "/";
+        }
+        next();
+      });
+
+      return middlewares;
+    },
+    static: [
+      {
+        directory: path.join(__dirname, "public", "Data"),
+        publicPath: `${DEV_PREFIX}/Data`,
+        watch: false, // 提供即時 Data 檔案，避免 in-memory stale assets
+      },
+    ],
   },
 };

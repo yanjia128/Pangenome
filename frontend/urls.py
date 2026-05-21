@@ -3,7 +3,7 @@ from . import views
 
 urlpatterns = [
     re_path(
-        r"^blog$|^blog/(?P<string>.+)$|^jbrowse$|^$",
+        r"^blog$|^blog/(?P<string>.+)$|^syntney$|^analysis$|^statistics$|^Annotation$|^$",
         views.spa_and_admin_handler,
         name="frontend",
     ),

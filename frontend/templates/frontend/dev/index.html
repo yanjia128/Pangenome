@@ -6,6 +6,17 @@
     <meta name="theme-color" content="#0C4B33" />
     <meta name="background-color" content="#0C4B33" />
     <meta name="author" content="Marcelo Cardoso" />
+    <script>
+      (() => {
+        const prefix = window.location.pathname.startsWith("/dendrobium")
+          ? "/dendrobium"
+          : "";
+        const script = document.createElement("script");
+        script.defer = true;
+        script.src = `${prefix}/index.js`;
+        document.head.appendChild(script);
+      })();
+    </script>
   </head>
   <body class="h-full">
     <div id="root"></div>

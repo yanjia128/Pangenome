@@ -350,8 +350,8 @@ function AnalsisPage() {
       return;
     }
 
-    const primary = `/dotplots/${speciesA}.${speciesB}.png`;
-    const fallback = `/dotplots/${speciesB}.${speciesA}.png`;
+    const primary = `/dendrobium/dotplots/${speciesA}.${speciesB}.png`;
+    const fallback = `/dendrobium/dotplots/${speciesB}.${speciesA}.png`;
     setDotplotTitle(
       `${displayByAssembly[speciesA] || speciesA} vs ${
         displayByAssembly[speciesB] || speciesB
@@ -372,14 +372,14 @@ function AnalsisPage() {
   };
 
   if (loading) {
-    return <div className="pa-loading">Analsis（Analysis Figures）資料載入中...</div>;
+    return <div className="pa-loading">Statistics（Analysis Figures）資料載入中...</div>;
   }
 
   if (error || !pangenomeData || !ksData) {
     return (
       <div className="pa-page">
         <div className="pa-error">
-          Analsis（Analysis Figures）頁面初始化失敗：{error || "資料不存在"}
+          Statistics（Analysis Figures）頁面初始化失敗：{error || "資料不存在"}
         </div>
       </div>
     );
@@ -387,7 +387,7 @@ function AnalsisPage() {
 
   return (
     <div className="pa-page">
-      <h2 className="text-2xl font-semibold">Analsis · Analysis Figures</h2>
+      <h2 className="text-2xl font-semibold">Statistics · Analysis Figures</h2>
 
       <div className="pa-section-title">Species Phylogeny</div>
       <div className="pa-card">
@@ -399,16 +399,16 @@ function AnalsisPage() {
           </div>
           {!speciesTreeMissing && (
             <img
-              src="/species_tree.png"
+              src="/dendrobium/species_tree.png"
               alt="Species Tree"
               style={{ cursor: "zoom-in", maxWidth: "100%" }}
-              onClick={() => setLightboxSrc("/species_tree.png")}
+              onClick={() => setLightboxSrc("/dendrobium/species_tree.png")}
               onError={() => setSpeciesTreeMissing(true)}
             />
           )}
           {speciesTreeMissing && (
             <div className="pa-warning">
-              缺少圖片：/species_tree.png
+              缺少圖片：/dendrobium/species_tree.png
             </div>
           )}
         </div>
