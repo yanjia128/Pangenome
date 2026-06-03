@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useApi } from "../api/use-api";
 import {
   Table,
@@ -11,8 +11,10 @@ import {
   Button,
   Spinner,
 } from "flowbite-react";
+import { HeatMapComponent, Inject, Legend, Tooltip, type ITooltipEventArgs, type ICellEventArgs } from "@syncfusion/ej2-react-heatmap";
 import { HiSearch, HiChevronUp, HiChevronDown } from "react-icons/hi";
-
+import { registerLicense } from '@syncfusion/ej2-base';
+registerLicense('Ngo9BigBOggjHTQxAR8/V1JHaF1cXmhOYVBpR2NbeU5xdl9HaFZTTGY/P1ZhSXxVdkNjWn5ccXxWRWhdWEx9XEE=');
 type SpeciesOption = {
   label: string;
   countsTsvPath: string;
@@ -40,10 +42,12 @@ type DiffResponse = {
 type HeatmapData = {
   genes: string[];
   samples: string[];
-  values: number[][];
-  rawValues: number[][];
-  min: number;
-  max: number;
+  matrix: number[][];
+  rawMatrix: number[][];
+  height: number;
+  width: number;
+  minValue: number;
+  maxValue: number;
 };
 
 const SPECIES_OPTIONS: SpeciesOption[] = [
@@ -127,8 +131,7 @@ function withCacheBuster(url: string): string {
 
 function buildTpmHeatmapData(
   headers: string[],
-  rows: Record<string, string>[],
-  maxGenes = 100
+  rows: Record<string, string>[]
 ): HeatmapData | null {
   if (headers.length < 2 || rows.length === 0) {
     return null;
@@ -140,127 +143,52 @@ function buildTpmHeatmapData(
     return null;
   }
 
-  const scoredRows = rows
+  const selectedRows = rows
     .map((row) => {
       const rawValues = sampleColumns.map((sample) => {
         const numericValue = Number.parseFloat(row[sample] ?? "");
         return Number.isFinite(numericValue) ? numericValue : 0;
       });
-      const mean = rawValues.reduce((sum, value) => sum + value, 0) / rawValues.length;
-      const variance =
-        rawValues.reduce((sum, value) => sum + (value - mean) ** 2, 0) / rawValues.length;
 
       return {
         gene: row[geneColumn] || "",
-        rawValues,
-        variance,
+        values: rawValues.map((value) => Math.log2(value + 1)),
       };
     })
     .filter((row) => row.gene.length > 0);
 
-  if (scoredRows.length === 0) {
+  if (selectedRows.length === 0) {
     return null;
   }
 
-  const selectedRows = scoredRows
-    .sort((a, b) => b.variance - a.variance)
-    .slice(0, maxGenes)
-    .sort((a, b) => b.variance - a.variance);
-
-  const values = selectedRows.map((row) => row.rawValues.map((value) => Math.log2(value + 1)));
-  const flattened = values.flat();
-  const min = flattened.length > 0 ? Math.min(...flattened) : 0;
-  const max = flattened.length > 0 ? Math.max(...flattened) : 0;
+  const matrix = sampleColumns.map((_, sampleIndex) =>
+    selectedRows.map((row) => row.values[sampleIndex])
+  );
+  const rawMatrix = sampleColumns.map((sample) =>
+    selectedRows.map((row) => {
+      const rawValue = Number.parseFloat(rows.find((sourceRow) => sourceRow[geneColumn] === row.gene)?.[sample] ?? "");
+      return Number.isFinite(rawValue) ? rawValue : 0;
+    })
+  );
+  const flattenedValues = matrix.flat();
+  const minValue = flattenedValues.length > 0 ? Math.min(...flattenedValues) : 0;
+  const maxValue = flattenedValues.length > 0 ? Math.max(...flattenedValues) : 0;
 
   return {
     genes: selectedRows.map((row) => row.gene),
     samples: sampleColumns,
-    rawValues: selectedRows.map((row) => row.rawValues),
-    values,
-    min,
-    max,
+    matrix,
+    rawMatrix,
+    height: Math.max(420, selectedRows.length * 26),
+    width: Math.max(900, sampleColumns.length * 52 + 220),
+    minValue,
+    maxValue,
   };
-}
-
-function getHeatmapColor(value: number, min: number, max: number): string {
-  if (max <= min) {
-    return "rgb(254, 243, 199)";
-  }
-
-  const ratio = Math.min(1, Math.max(0, (value - min) / (max - min)));
-  const hue = 48 - ratio * 42;
-  const saturation = 95 - ratio * 8;
-  const lightness = 94 - ratio * 48;
-  return `hsl(${hue.toFixed(1)} ${saturation.toFixed(1)}% ${lightness.toFixed(1)}%)`;
-}
-
-function ReactTpmHeatmap({ data }: { data: HeatmapData }) {
-  return (
-    <div className="space-y-4">
-      <div className="overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <div
-          className="grid min-w-max"
-          style={{
-            gridTemplateColumns: `220px repeat(${data.samples.length}, minmax(44px, 1fr))`,
-          }}
-        >
-          <div className="sticky left-0 top-0 z-20 border-b border-r border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            Gene / Sample
-          </div>
-          {data.samples.map((sample) => (
-            <div
-              key={sample}
-              className="sticky top-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-2 text-center text-[11px] font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-              style={{ writingMode: "vertical-rl", textOrientation: "mixed", minHeight: "120px" }}
-              title={sample}
-            >
-              {sample}
-            </div>
-          ))}
-
-          {data.genes.map((gene, rowIndex) => (
-            <React.Fragment key={gene}>
-              <div
-                className="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                title={gene}
-              >
-                {gene}
-              </div>
-              {data.values[rowIndex].map((value, colIndex) => {
-                const rawValue = data.rawValues[rowIndex][colIndex];
-                return (
-                  <div
-                    key={`${gene}-${data.samples[colIndex]}`}
-                    className="border-b border-r border-white/50"
-                    style={{
-                      backgroundColor: getHeatmapColor(value, data.min, data.max),
-                      width: "44px",
-                      height: "28px",
-                    }}
-                    title={`${gene}\n${data.samples[colIndex]}\nTPM: ${rawValue.toFixed(2)}\nlog2(TPM + 1): ${value.toFixed(2)}`}
-                  />
-                );
-              })}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-300">
-        <span className="font-medium">log2(TPM + 1)</span>
-        <span>{data.min.toFixed(2)}</span>
-        <div
-          className="h-3 w-40 rounded-full border border-gray-200 dark:border-gray-700"
-          style={{ background: "linear-gradient(90deg, hsl(48 95% 94%), hsl(6 87% 46%))" }}
-        />
-        <span>{data.max.toFixed(2)}</span>
-      </div>
-    </div>
-  );
 }
 
 export default function TranscriptomePage() {
   const { submitDifferentialExpression } = useApi();
+  const heatmapRef = useRef<HeatMapComponent | null>(null);
 
   const [selectedSpecies, setSelectedSpecies] = useState<SpeciesOption>(SPECIES_OPTIONS[0]);
   const [tableMode, setTableMode] = useState<ExpressionTableMode>("counts");
@@ -393,8 +321,18 @@ export default function TranscriptomePage() {
       return null;
     }
 
-    return buildTpmHeatmapData(tableData.headers, filteredData);
-  }, [filteredData, tableData.headers, tableMode]);
+    return buildTpmHeatmapData(tableData.headers, paginatedData);
+  }, [paginatedData, tableData.headers, tableMode]);
+
+  const heatmapKey = useMemo(() => {
+    if (tableMode !== "tpm") {
+      return "tpm-heatmap-hidden";
+    }
+
+    const geneColumn = tableData.headers[0] ?? "gene";
+    const visibleIds = paginatedData.map((row) => row[geneColumn] ?? "").join("|");
+    return `${selectedSpecies.backendSpecies}-${tableMode}-${currentPage}-${pageSize}-${visibleIds}`;
+  }, [currentPage, pageSize, paginatedData, selectedSpecies.backendSpecies, tableData.headers, tableMode]);
 
   const handleSort = (columnKey: string) => {
     setSortConfig((current) => {
@@ -421,6 +359,15 @@ export default function TranscriptomePage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDownloadHeatmap = () => {
+    if (!heatmapRef.current || tableMode !== "tpm") {
+      return;
+    }
+
+    const fileName = `${selectedSpecies.backendSpecies}_${tableMode}_heatmap_page_${currentPage}`;
+    heatmapRef.current.export("PNG", fileName);
   };
 
   const handleControlCheckbox = (col: string, checked: boolean) => {
@@ -589,13 +536,106 @@ export default function TranscriptomePage() {
 
         {!loading && tableMode === "tpm" && tpmHeatmapData && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
-            <div className="mb-3">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">TPM Heatmap (React)</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                依目前搜尋結果挑選變異最高的前 {tpmHeatmapData.genes.length} 個基因，並以 React grid 顯示 log2(TPM + 1)。
-              </p>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">TPM Heatmap (Syncfusion)</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  依目前表格這一頁顯示的 {tpmHeatmapData.genes.length} 個 ID 繪製 heatmap，並在格子中顯示 log2(TPM + 1) 數值。
+                </p>
+              </div>
+              <Button
+                type="button"
+                color="light"
+                onClick={handleDownloadHeatmap}
+                disabled={!tpmHeatmapData || tpmHeatmapData.genes.length === 0}
+              >
+                Download Heatmap
+              </Button>
             </div>
-            <ReactTpmHeatmap data={tpmHeatmapData} />
+            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800">
+              <div style={{ minWidth: `${tpmHeatmapData.width}px` }}>
+                <HeatMapComponent
+                  ref={(instance: HeatMapComponent | null) => {
+                    heatmapRef.current = instance;
+                  }}
+                  key={heatmapKey}
+                  id="transcriptome-tpm-heatmap"
+                  dataSource={tpmHeatmapData.matrix}
+                  dataSourceSettings={{
+                    isJsonData: false,
+                    adaptorType: "Table",
+                  }}
+                  height={`${tpmHeatmapData.height}px`}
+                  width={`${tpmHeatmapData.width}px`}
+                  showTooltip={true}
+                  xAxis={{
+                    valueType: "Category",
+                    labels: tpmHeatmapData.samples,
+                    labelRotation: 315,
+                    labelIntersectAction: "None",
+                    textStyle: { size: "11px" },
+                  }}
+                  yAxis={{
+                    valueType: "Category",
+                    labels: tpmHeatmapData.genes,
+                    isInversed: true,
+                    labelIntersectAction: "None",
+                    textStyle: { size: "10px" },
+                  }}
+                  paletteSettings={{
+                    type: "Gradient",
+                    palette: [
+                      { value: tpmHeatmapData.minValue, color: "#fef3c7" },
+                      {
+                        value: (tpmHeatmapData.minValue + tpmHeatmapData.maxValue) / 2,
+                        color: "#f59e0b",
+                      },
+                      { value: tpmHeatmapData.maxValue, color: "#b91c1c" },
+                    ],
+                  }}
+                  legendSettings={{ visible: true, position: "Bottom" }}
+                  cellSettings={{
+                    border: { width: 0 },
+                    showLabel: true,
+                    enableCellHighlighting: true,
+                    textStyle: {
+                      size: "9px",
+                      fontWeight: "500",
+                    },
+                  }}
+                  cellRender={(args: ICellEventArgs) => {
+                    const sampleIndex = tpmHeatmapData.samples.indexOf(String(args.xLabel));
+                    const geneIndex = tpmHeatmapData.genes.indexOf(String(args.yLabel));
+                    const rawValue =
+                      sampleIndex >= 0 && geneIndex >= 0
+                        ? tpmHeatmapData.rawMatrix[sampleIndex]?.[geneIndex]
+                        : undefined;
+
+                    args.displayText =
+                      typeof rawValue === "number" && Number.isFinite(rawValue)
+                        ? rawValue.toFixed(1)
+                        : "";
+                  }}
+                  tooltipRender={(args: ITooltipEventArgs) => {
+                    const sampleIndex = tpmHeatmapData.samples.indexOf(String(args.xLabel));
+                    const geneIndex = tpmHeatmapData.genes.indexOf(String(args.yLabel));
+                    const rawValue =
+                      sampleIndex >= 0 && geneIndex >= 0
+                        ? tpmHeatmapData.rawMatrix[sampleIndex]?.[geneIndex]
+                        : undefined;
+
+                    args.content = [
+                      `Gene: ${args.yLabel}`,
+                      `Sample: ${args.xLabel}`,
+                      `TPM: ${typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue.toFixed(2) : "N/A"}`,
+                      `Heatmap value: ${Number(args.value).toFixed(2)} log2(TPM + 1)`,
+                    ];
+                  }}
+                >
+                  <Inject services={[Legend, Tooltip]} />
+                </HeatMapComponent>
+              </div>
+            </div>
           </div>
         )}
 
@@ -720,7 +760,7 @@ export default function TranscriptomePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h4 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">控制組 (Control Group)</h4>
-              <div className="border border-gray-200 dark:border-gray-6Heatmap00 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
+              <div className="border border-gray-200 dark:border-gray-600 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
                 <div className="grid grid-cols-2 gap-2">
                   {columnStatuses.map((cs) => (
                     <label key={cs.col} className="flex items-center space-x-2 cursor-pointer">
