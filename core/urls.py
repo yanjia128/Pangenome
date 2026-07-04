@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import re_path, include
 from core.settings.base import STATIC_ROOT, MEDIA_ROOT
 from django.views.static import serve
+from core.jbrowse_serve import serve_jbrowse
 import os
 
 admin.site.site_header = "Django-React-Typescript Admin"
@@ -71,7 +72,7 @@ urlpatterns = [
     ),
     re_path(
         r"^dendrobium/SyntneyViewer/(?P<path>.*)$",
-        serve,
+        serve_jbrowse,
         {
             "document_root": JBROWSE_ROOT,
         },

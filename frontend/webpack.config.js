@@ -7,6 +7,8 @@ const Dotenv = require("dotenv-webpack");
 
 const PUBLIC_PATH = "/static/frontend/";
 const DEV_PREFIX = "/dendrobium";
+const JBROWSE_PREFIX = `${DEV_PREFIX}/SyntneyViewer`;
+const BACKEND_URL = "http://localhost:8866";
 
 const PORT = 4000;
 
@@ -121,7 +123,9 @@ module.exports = {
 
         if (
           req.url === `${DEV_PREFIX}/Data` ||
-          req.url.startsWith(`${DEV_PREFIX}/Data/`)
+          req.url.startsWith(`${DEV_PREFIX}/Data/`) ||
+          req.url === JBROWSE_PREFIX ||
+          req.url.startsWith(`${JBROWSE_PREFIX}/`)
         ) {
           next();
           return;
@@ -140,6 +144,13 @@ module.exports = {
         directory: path.join(__dirname, "public", "Data"),
         publicPath: `${DEV_PREFIX}/Data`,
         watch: false, // 提供即時 Data 檔案，避免 in-memory stale assets
+      },
+    ],
+    proxy: [
+      {
+        context: [JBROWSE_PREFIX],
+        target: BACKEND_URL,
+        changeOrigin: true,
       },
     ],
   },

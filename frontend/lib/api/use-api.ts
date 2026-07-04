@@ -5,6 +5,7 @@ import {
   getFilteredPublicationsEndoint,
   getPaginatedFilteredPublicationsEndoint,
   getOrthogroupsEndpoint,
+  getOrthogroupFastaDownloadEndpoint,
   getGeneTreesEndpoint,
   getGeneTreeDetailEndpoint,
   getDifferentialExpressionEndpoint,
@@ -154,6 +155,34 @@ export function useApi() {
       });
   }
 
+  async function downloadOrthogroupFasta(orthogroupId: string): Promise<Blob> {
+    const path = getOrthogroupFastaDownloadEndpoint(orthogroupId);
+    const endpoint = isProd ? path : apiBaseUrl + path;
+
+    const response = await fetch(endpoint, {
+      cache: "no-cache",
+      method: "GET",
+      headers: getHeaders,
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}`;
+
+      try {
+        const errorData = await response.json();
+        if (typeof errorData?.error === "string" && errorData.error.length > 0) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // Ignore JSON parsing errors and keep the HTTP-based message.
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    return response.blob();
+  }
+
   async function getGeneTreeList(args?: {
     page?: number;
     page_size?: number;
@@ -207,12 +236,16 @@ export function useApi() {
     comparison_samples: string[];
     all_columns_map: { col: string; stat: "control" | "comparison" | "unselected" }[];
     size: string;
+    fdr: number;
+    logfc: number;
   }): Promise<{
     status?: string;
     volcano_path?: string;
     ma_path?: string;
+    csv_path?: string;
     jobID?: string;
     cached?: boolean;
+    method?: string;
     error?: string;
   } | null> {
     const mappedMethod = payload.method === "DESeq2" ? "DESeq2" : "edgeR";
@@ -250,6 +283,7 @@ export function useApi() {
     getPaginatedPublications,
     getPublication,
     getOrthogroups,
+    downloadOrthogroupFasta,
     getGeneTreeList,
     getGeneTree,
     submitDifferentialExpression,

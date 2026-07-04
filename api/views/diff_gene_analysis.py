@@ -33,6 +33,8 @@ class DifferentialExpressionAnalysisEndpoint(APIView):
             print("Species:", species)
             method = data.get("method")
             size_ = data.get("size")
+            fdr = float(data.get("fdr", 0.05))
+            logfc = float(data.get("logfc", 1))
             meta_data = data.get("all_columns_map", [])
             print("Meta Columns:", meta_data)
             print("Method: {0}, Size: {1}.".format(method, size_))
@@ -52,9 +54,9 @@ class DifferentialExpressionAnalysisEndpoint(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             if method == "edgeR":
-                runner = EDGERRunner(species, meta_data)
+                runner = EDGERRunner(species, meta_data, fdr=fdr, logfc=logfc)
             else:
-                runner = DESEQ2Runner(species, meta_data, size_)
+                runner = DESEQ2Runner(species, meta_data, size_, fdr=fdr, logfc=logfc)
             cache_result = runner.check_cache()
             if cache_result["exists"]:
                 print("--- 找到快取，直接回傳 ---")
@@ -63,6 +65,7 @@ class DifferentialExpressionAnalysisEndpoint(APIView):
                         "status": "success",
                         "volcano_path": cache_result["volcano_path"],
                         "ma_path": cache_result["ma_path"],
+                        "csv_path": cache_result.get("csv_path", ""),
                         "jobID": runner.job_id,
                         "cached": True,
                     }
@@ -116,24 +119,18 @@ class DifferentialExpressionAnalysisEndpoint(APIView):
             """
             if method == "edgeR":
                 analysis_results = runner.run_edgeR()
-                return Response(
-                    {
-                        "status": "success",
-                        "volcano_path": analysis_results["volcano_path"],
-                        "ma_path": analysis_results["ma_path"],
-                        "jobID": runner.job_id,
-                    }
-                )
             else:
                 analysis_results = runner.run_deseq2()
-                return Response(
-                    {
-                        "status": "success",
-                        "volcano_path": analysis_results["volcano_path"],
-                        "ma_path": analysis_results["ma_path"],
-                        "jobID": runner.job_id,
-                    }
-                )
+            return Response(
+                {
+                    "status": "success",
+                    "volcano_path": analysis_results["volcano_path"],
+                    "ma_path": analysis_results["ma_path"],
+                    "csv_path": analysis_results.get("csv_path", ""),
+                    "jobID": runner.job_id,
+                    "method": method,
+                }
+            )
         except Exception as e:
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR

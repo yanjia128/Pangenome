@@ -27,11 +27,13 @@ def _is_non_empty_file(path):
 
 
 class DESEQ2Runner:
-    def __init__(self, species, status_list, size):
+    def __init__(self, species, status_list, size, fdr=0.05, logfc=1):
         print("Start DESEQ2Runner")
         self.species = species
         self.job_id = generate_job_id(status_list)
         self.size_ = size
+        self.fdr = fdr
+        self.logfc = logfc
         self.counts_path = os.path.join(TEMP_DIR, "temp_count.csv")
         self.metadata_path = os.path.join(TEMP_DIR, "temp_meta.csv")
         base_output_path = os.path.join(STATIC_DIR, species)
@@ -49,7 +51,9 @@ class DESEQ2Runner:
         --metadata {self.metadata_path} \
         --outdir {self.output_path} \
         --prefix {self.species} \
-        --size {self.size_}
+        --size {self.size_} \
+        --fdr {self.fdr} \
+        --logfc {self.logfc}
         """.format(self=self, conda_bin=conda_bin, script_path=deseq2_script_path)
         subprocess.run(R_script, shell=True, check=True)
         print("DESeq2 分析完成，總耗時: %.2f 秒" % (time.time() - start))
@@ -59,40 +63,39 @@ class DESEQ2Runner:
         ma_file = os.path.join(self.output_path, f"{self.species}_DESeq2_MA.png")
         if not _is_non_empty_file(volcano_file) or not _is_non_empty_file(ma_file):
             raise RuntimeError("DESeq2 output images are missing or empty.")
+        url_base = "/dendrobium/Data/DGA/{0}/{1}".format(self.species, self.job_id)
         return {
-            "volcano_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_DESeq2_Volcano.png".format(
-                self.species, self.job_id, self.species
-            ),
-            "ma_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_DESeq2_MA.png".format(
-                self.species, self.job_id, self.species
-            ),
+            "volcano_path": "{0}/{1}_DESeq2_Volcano.png".format(url_base, self.species),
+            "ma_path": "{0}/{1}_DESeq2_MA.png".format(url_base, self.species),
+            "csv_path": "{0}/{1}_DESeq2_results.csv".format(url_base, self.species),
         }
 
     def check_cache(self):
         """檢查是否有現成的圖片，若有則回傳網址路徑"""
-        # 定義預期的檔名
         volcano_name = "{0}_DESeq2_Volcano.png".format(self.species)
         ma_name = "{0}_DESeq2_MA.png".format(self.species)
+        csv_name = "{0}_DESeq2_results.csv".format(self.species)
 
-        # 實體路徑 (用於檢查)
         volcano_file = os.path.join(self.output_path, volcano_name)
         ma_file = os.path.join(self.output_path, ma_name)
 
         if _is_non_empty_file(volcano_file) and _is_non_empty_file(ma_file):
-            # 構建網址路徑 (用於回傳前端)
             url_base = "/dendrobium/Data/DGA/{0}/{1}".format(self.species, self.job_id)
             return {
                 "exists": True,
                 "volcano_path": "{0}/{1}".format(url_base, volcano_name),
                 "ma_path": "{0}/{1}".format(url_base, ma_name),
+                "csv_path": "{0}/{1}".format(url_base, csv_name),
             }
         return {"exists": False}
 
 
 class EDGERRunner:
-    def __init__(self, species, status_list):
+    def __init__(self, species, status_list, fdr=0.05, logfc=1):
         self.species = species
         self.job_id = generate_job_id(status_list)
+        self.fdr = fdr
+        self.logfc = logfc
         self.counts_path = os.path.join(TEMP_DIR, "temp_count.csv")
         self.metadata_path = os.path.join(TEMP_DIR, "temp_meta.csv")
         base_output_path = os.path.join(STATIC_DIR, species)
@@ -114,7 +117,9 @@ class EDGERRunner:
         --counts {self.counts_path} \
         --metadata {self.metadata_path} \
         --outdir {self.output_path} \
-        --prefix {self.species}
+        --prefix {self.species} \
+        --fdr {self.fdr} \
+        --logfc {self.logfc}
         """.format(self=self, conda_bin=conda_bin, script_path=edge_r_script_path)
         subprocess.run(R_script, shell=True, check=True)
         print("edgeR 分析完成，總耗時: %.2f 秒" % (time.time() - start))
@@ -124,32 +129,29 @@ class EDGERRunner:
         ma_file = os.path.join(self.output_path, f"{self.species}_edgeR_MA.png")
         if not _is_non_empty_file(volcano_file) or not _is_non_empty_file(ma_file):
             raise RuntimeError("edgeR output images are missing or empty.")
+        url_base = "/dendrobium/Data/DGA/{0}/{1}".format(self.species, self.job_id)
         return {
-            "volcano_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_edgeR_Volcano.png".format(
-                self.species, self.job_id, self.species
-            ),
-            "ma_path": "/dendrobium/Data/DGA/{0}/{1}/{2}_edgeR_MA.png".format(
-                self.species, self.job_id, self.species
-            ),
+            "volcano_path": "{0}/{1}_edgeR_Volcano.png".format(url_base, self.species),
+            "ma_path": "{0}/{1}_edgeR_MA.png".format(url_base, self.species),
+            "csv_path": "{0}/{1}_edgeR_exactTest.csv".format(url_base, self.species),
         }
 
     def check_cache(self):
         """檢查是否有現成的圖片，若有則回傳網址路徑"""
-        # 定義預期的檔名
         volcano_name = "{0}_edgeR_Volcano.png".format(self.species)
         ma_name = "{0}_edgeR_MA.png".format(self.species)
+        csv_name = "{0}_edgeR_exactTest.csv".format(self.species)
 
-        # 實體路徑 (用於檢查)
         volcano_file = os.path.join(self.output_path, volcano_name)
         ma_file = os.path.join(self.output_path, ma_name)
 
         if _is_non_empty_file(volcano_file) and _is_non_empty_file(ma_file):
-            # 構建網址路徑 (用於回傳前端)
             url_base = "/dendrobium/Data/DGA/{0}/{1}".format(self.species, self.job_id)
             return {
                 "exists": True,
                 "volcano_path": "{0}/{1}".format(url_base, volcano_name),
                 "ma_path": "{0}/{1}".format(url_base, ma_name),
+                "csv_path": "{0}/{1}".format(url_base, csv_name),
             }
         return {"exists": False}
 

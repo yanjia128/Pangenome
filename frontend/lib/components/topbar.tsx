@@ -6,9 +6,9 @@ const NAV_ITEMS = [
   { label: "Home", route: ROUTES.HOME },
   { label: "Statistics", route: ROUTES.STATISTICS },
   { label: "Annotation", route: ROUTES.ANNOTATION },
-  { label: "Phylogene Tree", route: ROUTES.PHYLOCANVAS },
   { label: "Group", route: ROUTES.ORTHOGROUPS },
   { label: "Differential Expression (DEG)", route: ROUTES.TRANSCRIPTOME },
+  // { label: "Phylogene Tree", route: ROUTES.PHYLOCANVAS },
   //{ label: "Synteny", route: ROUTES.SYNTENY },
   //{ label: "Contact", route: ROUTES.CONTACT },
 ];

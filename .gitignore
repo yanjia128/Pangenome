@@ -47,3 +47,4 @@ frontend/public/Data
 
 #logs/
 logs/
+.dev.pid

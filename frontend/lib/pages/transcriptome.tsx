@@ -12,7 +12,8 @@ import {
   Spinner,
 } from "flowbite-react";
 import { HeatMapComponent, Inject, Legend, Tooltip, type ITooltipEventArgs, type ICellEventArgs } from "@syncfusion/ej2-react-heatmap";
-import { HiSearch, HiChevronUp, HiChevronDown } from "react-icons/hi";
+import { HiSearch, HiChevronUp, HiChevronDown, HiDownload } from "react-icons/hi";
+import { loadPlotly, type PlotlyLike } from "./pangenome-data";
 import { registerLicense } from '@syncfusion/ej2-base';
 registerLicense('Ngo9BigBOggjHTQxAR8/V1JHaF1cXmhOYVBpR2NbeU5xdl9HaFZTTGY/P1ZhSXxVdkNjWn5ccXxWRWhdWEx9XEE=');
 type SpeciesOption = {
@@ -34,8 +35,10 @@ type DiffResponse = {
   status?: string;
   volcano_path?: string;
   ma_path?: string;
+  csv_path?: string;
   jobID?: string;
   cached?: boolean;
+  method?: string;
   error?: string;
 };
 
@@ -129,6 +132,25 @@ function withCacheBuster(url: string): string {
   return `${url}?_t=${timestamp}`;
 }
 
+function parseCsvResult(csvText: string): Record<string, string>[] {
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(",").map((h) => h.replace(/^"|"$/g, ""));
+  return lines.slice(1).map((line) => {
+    const values = line.split(",").map((v) => v.replace(/^"|"$/g, ""));
+    const row: Record<string, string> = {};
+    headers.forEach((header, i) => {
+      row[header] = values[i] || "";
+    });
+    return row;
+  });
+}
+
 function buildTpmHeatmapData(
   headers: string[],
   rows: Record<string, string>[]
@@ -152,7 +174,7 @@ function buildTpmHeatmapData(
 
       return {
         gene: row[geneColumn] || "",
-        values: rawValues.map((value) => Math.log2(value + 1)),
+        values: rawValues.map((value: number) => Math.log2(value + 1)),
       };
     })
     .filter((row) => row.gene.length > 0);
@@ -190,6 +212,10 @@ export default function TranscriptomePage() {
   const { submitDifferentialExpression } = useApi();
   const heatmapRef = useRef<HeatMapComponent | null>(null);
 
+  const handleHeatmapRef = (instance: HeatMapComponent | null) => {
+    heatmapRef.current = instance;
+  };
+
   const [selectedSpecies, setSelectedSpecies] = useState<SpeciesOption>(SPECIES_OPTIONS[0]);
   const [tableMode, setTableMode] = useState<ExpressionTableMode>("counts");
   const [loading, setLoading] = useState(false);
@@ -216,6 +242,13 @@ export default function TranscriptomePage() {
   const [runningAnalysis, setRunningAnalysis] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<DiffResponse | null>(null);
   const [analysisError, setAnalysisError] = useState<string>("");
+  const [analysisFdr, setAnalysisFdr] = useState<number>(0.05);
+  const [analysisLogfc, setAnalysisLogfc] = useState<number>(1);
+  const [csvData, setCsvData] = useState<Record<string, string>[] | null>(null);
+  const [loadingCsv, setLoadingCsv] = useState(false);
+  const volcanoPlotRef = useRef<HTMLDivElement | null>(null);
+  const maPlotRef = useRef<HTMLDivElement | null>(null);
+  const plotlyRef = useRef<PlotlyLike | null>(null);
 
   const getMethodBySelection = useCallback(
     (controlCount: number, comparisonCount: number): DiffMethod =>
@@ -233,6 +266,177 @@ export default function TranscriptomePage() {
     setAnalysisMethod(method);
     setAnalysisSize(size);
   }, [selectedControl.length, selectedComparison.length, getMethodBySelection]);
+
+  useEffect(() => {
+    if (!csvData || !analysisResult) return;
+
+    const method = analysisResult.method ?? analysisMethod;
+    const isEdgeR = method === "edgeR";
+
+    const fcCol = isEdgeR ? "logFC" : "log2FoldChange";
+    const pCol = isEdgeR ? "FDR" : "padj";
+    const meanCol = isEdgeR ? "logCPM" : "baseMean";
+
+    const genes: string[] = [];
+    const fc: number[] = [];
+    const pvals: number[] = [];
+    const means: number[] = [];
+
+    for (const row of csvData) {
+      const fcVal = parseFloat(row[fcCol]);
+      const pVal = parseFloat(row[pCol]);
+      const meanVal = parseFloat(row[meanCol]);
+      if (isNaN(fcVal) || isNaN(pVal)) continue;
+      const gene = row[Object.keys(row)[0]] || "";
+      genes.push(gene);
+      fc.push(fcVal);
+      pvals.push(pVal);
+      means.push(isEdgeR ? meanVal : Math.log10(meanVal + 1));
+    }
+
+    const sigColors = fc.map((f, i) => {
+      if (pvals[i] < analysisFdr && f > analysisLogfc) return "red";
+      if (pvals[i] < analysisFdr && f < -analysisLogfc) return "blue";
+      return "grey";
+    });
+
+    void (async () => {
+      try {
+        const Plotly = plotlyRef.current ?? (await loadPlotly());
+        plotlyRef.current = Plotly;
+
+        if (volcanoPlotRef.current) {
+          const upIdx    = fc.map((f, i) => pvals[i] < analysisFdr && f >  analysisLogfc ? i : -1).filter(i => i >= 0);
+          const downIdx  = fc.map((f, i) => pvals[i] < analysisFdr && f < -analysisLogfc ? i : -1).filter(i => i >= 0);
+          const nsIdx    = fc.map((_, i) => sigColors[i] === "grey" ? i : -1).filter(i => i >= 0);
+
+          const pick = (arr: number[], idx: number[]) => idx.map(i => arr[i]);
+          const pickStr = (arr: string[], idx: number[]) => idx.map(i => arr[i]);
+          const negLog10 = pvals.map(p => -Math.log10(p));
+
+          const volcanoTraces = [
+            {
+              name: "Not significant",
+              x: pick(fc, nsIdx), y: pick(negLog10, nsIdx),
+              mode: "markers", type: "scatter",
+              marker: { color: "grey", size: 5, opacity: 0.4 },
+              text: pickStr(genes, nsIdx),
+              hovertemplate: "Gene: %{text}<br>log2FC: %{x:.2f}<br>-log10(p): %{y:.2f}<extra></extra>",
+            },
+            {
+              name: "Up-regulated",
+              x: pick(fc, upIdx), y: pick(negLog10, upIdx),
+              mode: "markers", type: "scatter",
+              marker: { color: "red", size: 6, opacity: 0.7 },
+              text: pickStr(genes, upIdx),
+              hovertemplate: "Gene: %{text}<br>log2FC: %{x:.2f}<br>-log10(p): %{y:.2f}<extra></extra>",
+            },
+            {
+              name: "Down-regulated",
+              x: pick(fc, downIdx), y: pick(negLog10, downIdx),
+              mode: "markers", type: "scatter",
+              marker: { color: "blue", size: 6, opacity: 0.7 },
+              text: pickStr(genes, downIdx),
+              hovertemplate: "Gene: %{text}<br>log2FC: %{x:.2f}<br>-log10(p): %{y:.2f}<extra></extra>",
+            },
+          ];
+
+          const volcanoLayout: Record<string, unknown> = {
+            title: `Volcano Plot (${method}) — P < ${analysisFdr} & |log2FC| > ${analysisLogfc}`,
+            xaxis: { title: "Log2 Fold Change" },
+            yaxis: { title: "-Log10(adjusted P)" },
+            shapes: [
+              { type: "line", x0: -analysisLogfc, x1: -analysisLogfc, y0: 0, y1: 1, yref: "paper", line: { dash: "dash", color: "black", width: 1 } },
+              { type: "line", x0: analysisLogfc, x1: analysisLogfc, y0: 0, y1: 1, yref: "paper", line: { dash: "dash", color: "black", width: 1 } },
+              { type: "line", x0: 0, x1: 1, xref: "paper", y0: -Math.log10(analysisFdr), y1: -Math.log10(analysisFdr), line: { dash: "dash", color: "black", width: 1 } },
+            ],
+            margin: { t: 50, b: 50, l: 60, r: 30 },
+          };
+
+          await Plotly.newPlot(volcanoPlotRef.current, volcanoTraces, volcanoLayout, { responsive: true });
+        }
+
+        if (maPlotRef.current) {
+          const xAxisTitle = isEdgeR ? "Average Log2 CPM" : "log10(Mean Expression)";
+          const maHover = `Gene: %{text}<br>${xAxisTitle}: %{x:.2f}<br>log2FC: %{y:.2f}<extra></extra>`;
+
+          const pick = (arr: number[], idx: number[]) => idx.map(i => arr[i]);
+          const pickStr = (arr: string[], idx: number[]) => idx.map(i => arr[i]);
+          const upIdx   = fc.map((_, i) => sigColors[i] === "red"  ? i : -1).filter(i => i >= 0);
+          const downIdx = fc.map((_, i) => sigColors[i] === "blue" ? i : -1).filter(i => i >= 0);
+          const nsIdx   = fc.map((_, i) => sigColors[i] === "grey" ? i : -1).filter(i => i >= 0);
+
+          const maTraces = [
+            {
+              name: "Not significant",
+              x: pick(means, nsIdx), y: pick(fc, nsIdx),
+              mode: "markers", type: "scatter",
+              marker: { color: "grey", size: 5, opacity: 0.4 },
+              text: pickStr(genes, nsIdx),
+              hovertemplate: maHover,
+            },
+            {
+              name: "Up-regulated",
+              x: pick(means, upIdx), y: pick(fc, upIdx),
+              mode: "markers", type: "scatter",
+              marker: { color: "red", size: 6, opacity: 0.7 },
+              text: pickStr(genes, upIdx),
+              hovertemplate: maHover,
+            },
+            {
+              name: "Down-regulated",
+              x: pick(means, downIdx), y: pick(fc, downIdx),
+              mode: "markers", type: "scatter",
+              marker: { color: "blue", size: 6, opacity: 0.7 },
+              text: pickStr(genes, downIdx),
+              hovertemplate: maHover,
+            },
+          ];
+
+          const maLayout: Record<string, unknown> = {
+            title: `MA Plot (${method}) — P < ${analysisFdr} & |log2FC| > ${analysisLogfc}`,
+            xaxis: { title: xAxisTitle },
+            yaxis: { title: "Log2 Fold Change" },
+            shapes: [
+              { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "black", width: 1 } },
+            ],
+            margin: { t: 50, b: 50, l: 60, r: 30 },
+          };
+
+          await Plotly.newPlot(maPlotRef.current, maTraces, maLayout, { responsive: true });
+        }
+      } catch (err) {
+        console.error("Failed to render Plotly plots:", err);
+      }
+    })();
+
+    return () => {
+      if (plotlyRef.current) {
+        if (volcanoPlotRef.current) plotlyRef.current.purge(volcanoPlotRef.current);
+        if (maPlotRef.current) plotlyRef.current.purge(maPlotRef.current);
+      }
+    };
+  }, [csvData, analysisResult, analysisFdr, analysisLogfc, analysisMethod]);
+
+  const handleDownloadCsv = () => {
+    if (!analysisResult?.csv_path) return;
+    const link = document.createElement("a");
+    link.href = analysisResult.csv_path;
+    link.download = analysisResult.csv_path.split("/").pop() ?? "results.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadPlot = async (ref: React.RefObject<HTMLDivElement | null>, filename: string) => {
+    if (!ref.current || !plotlyRef.current) return;
+    const Plotly = plotlyRef.current as PlotlyLike & {
+      downloadImage: (el: HTMLElement, opts: Record<string, unknown>) => Promise<void>;
+    };
+    if (typeof Plotly.downloadImage === "function") {
+      await Plotly.downloadImage(ref.current, { format: "png", width: 1200, height: 800, filename });
+    }
+  };
 
   const loadTableData = async () => {
     setLoading(true);
@@ -275,7 +479,7 @@ export default function TranscriptomePage() {
     if (!searchTerm) return tableData.rows;
 
     return tableData.rows.filter((row) => {
-      return Object.values(row).some((value) =>
+      return Object.values(row).some((value: string) =>
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
@@ -425,6 +629,7 @@ export default function TranscriptomePage() {
     setAnalysisMethod(method);
     setAnalysisSize(size);
     setAnalysisResult(null);
+    setCsvData(null);
     setRunningAnalysis(true);
 
     try {
@@ -435,6 +640,8 @@ export default function TranscriptomePage() {
         comparison_samples: selectedComparison,
         all_columns_map: allColumnsMap,
         size: String(size),
+        fdr: analysisFdr,
+        logfc: analysisLogfc,
       });
 
       if (!response || response.error) {
@@ -442,9 +649,21 @@ export default function TranscriptomePage() {
       }
 
       setAnalysisResult(response);
+      setRunningAnalysis(false);
+
+      if (response.csv_path) {
+        setLoadingCsv(true);
+        try {
+          const csvResponse = await fetch(response.csv_path);
+          const csvText = await csvResponse.text();
+          const parsed = parseCsvResult(csvText);
+          setCsvData(parsed);
+        } finally {
+          setLoadingCsv(false);
+        }
+      }
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "差異分析失敗，請稍後再試。");
-    } finally {
       setRunningAnalysis(false);
     }
   };
@@ -534,112 +753,223 @@ export default function TranscriptomePage() {
           </div>
         )}
 
-        {!loading && tableMode === "tpm" && tpmHeatmapData && (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">TPM Heatmap (Syncfusion)</h4>
+        {!loading && tableMode === "tpm" && tpmHeatmapData && tableData.headers.length > 0 && (
+          <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">TPM Heatmap (Syncfusion)</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Based on the {tpmHeatmapData.genes.length} IDs displayed on this current page of the table, a heatmap is drawn, and the log2(TPM + 1) value is displayed in the cells.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  color="light"
+                  onClick={handleDownloadHeatmap}
+                  disabled={!tpmHeatmapData || tpmHeatmapData.genes.length === 0}
+                >
+                  Download Heatmap
+                </Button>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800">
+                <div className="flex justify-center">
+                  <div style={{ minWidth: `${tpmHeatmapData.width}px` }}>
+                    <HeatMapComponent
+                      ref={handleHeatmapRef}
+                      key={heatmapKey}
+                      id="transcriptome-tpm-heatmap"
+                      dataSource={tpmHeatmapData.matrix}
+                      dataSourceSettings={{
+                        isJsonData: false,
+                        adaptorType: "Table",
+                      }}
+                      height={`${tpmHeatmapData.height}px`}
+                      width={`${tpmHeatmapData.width}px`}
+                      showTooltip={true}
+                      xAxis={{
+                        valueType: "Category",
+                        labels: tpmHeatmapData.samples,
+                        labelRotation: 315,
+                        labelIntersectAction: "None",
+                        textStyle: { size: "11px" },
+                      }}
+                      yAxis={{
+                        valueType: "Category",
+                        labels: tpmHeatmapData.genes,
+                        isInversed: true,
+                        labelIntersectAction: "None",
+                        textStyle: { size: "10px" },
+                      }}
+                      paletteSettings={{
+                        type: "Gradient",
+                        palette: [
+                          { value: tpmHeatmapData.minValue, color: "#fef3c7" },
+                          {
+                            value: (tpmHeatmapData.minValue + tpmHeatmapData.maxValue) / 2,
+                            color: "#f59e0b",
+                          },
+                          { value: tpmHeatmapData.maxValue, color: "#b91c1c" },
+                        ],
+                      }}
+                      legendSettings={{ visible: true, position: "Bottom" }}
+                      cellSettings={{
+                        border: { width: 0 },
+                        showLabel: true,
+                        enableCellHighlighting: true,
+                        textStyle: {
+                          size: "9px",
+                          fontWeight: "500",
+                        },
+                      }}
+                      cellRender={(args: ICellEventArgs) => {
+                        const sampleIndex = tpmHeatmapData.samples.indexOf(String(args.xLabel));
+                        const geneIndex = tpmHeatmapData.genes.indexOf(String(args.yLabel));
+                        const rawValue =
+                          sampleIndex >= 0 && geneIndex >= 0
+                            ? tpmHeatmapData.rawMatrix[sampleIndex]?.[geneIndex]
+                            : undefined;
+
+                        args.displayText =
+                          typeof rawValue === "number" && Number.isFinite(rawValue)
+                            ? rawValue.toFixed(1)
+                            : "";
+                      }}
+                      tooltipRender={(args: ITooltipEventArgs) => {
+                        const sampleIndex = tpmHeatmapData.samples.indexOf(String(args.xLabel));
+                        const geneIndex = tpmHeatmapData.genes.indexOf(String(args.yLabel));
+                        const rawValue =
+                          sampleIndex >= 0 && geneIndex >= 0
+                            ? tpmHeatmapData.rawMatrix[sampleIndex]?.[geneIndex]
+                            : undefined;
+
+                        args.content = [
+                          `Gene: ${args.yLabel}`,
+                          `Sample: ${args.xLabel}`,
+                          `TPM: ${typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue.toFixed(2) : "N/A"}`,
+                          `Heatmap value: ${Number(args.value).toFixed(2)} log2(TPM + 1)`,
+                        ];
+                      }}
+                    >
+                      <Inject services={[Legend, Tooltip]} />
+                    </HeatMapComponent>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <div className="mb-3">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">TPM Table</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  依目前表格這一頁顯示的 {tpmHeatmapData.genes.length} 個 ID 繪製 heatmap，並在格子中顯示 log2(TPM + 1) 數值。
+                  The table on the right stays synchronized with the current TPM page, search term, and sort order.
                 </p>
               </div>
-              <Button
-                type="button"
-                color="light"
-                onClick={handleDownloadHeatmap}
-                disabled={!tpmHeatmapData || tpmHeatmapData.genes.length === 0}
-              >
-                Download Heatmap
-              </Button>
-            </div>
-            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800">
-              <div style={{ minWidth: `${tpmHeatmapData.width}px` }}>
-                <HeatMapComponent
-                  ref={(instance: HeatMapComponent | null) => {
-                    heatmapRef.current = instance;
-                  }}
-                  key={heatmapKey}
-                  id="transcriptome-tpm-heatmap"
-                  dataSource={tpmHeatmapData.matrix}
-                  dataSourceSettings={{
-                    isJsonData: false,
-                    adaptorType: "Table",
-                  }}
-                  height={`${tpmHeatmapData.height}px`}
-                  width={`${tpmHeatmapData.width}px`}
-                  showTooltip={true}
-                  xAxis={{
-                    valueType: "Category",
-                    labels: tpmHeatmapData.samples,
-                    labelRotation: 315,
-                    labelIntersectAction: "None",
-                    textStyle: { size: "11px" },
-                  }}
-                  yAxis={{
-                    valueType: "Category",
-                    labels: tpmHeatmapData.genes,
-                    isInversed: true,
-                    labelIntersectAction: "None",
-                    textStyle: { size: "10px" },
-                  }}
-                  paletteSettings={{
-                    type: "Gradient",
-                    palette: [
-                      { value: tpmHeatmapData.minValue, color: "#fef3c7" },
-                      {
-                        value: (tpmHeatmapData.minValue + tpmHeatmapData.maxValue) / 2,
-                        color: "#f59e0b",
-                      },
-                      { value: tpmHeatmapData.maxValue, color: "#b91c1c" },
-                    ],
-                  }}
-                  legendSettings={{ visible: true, position: "Bottom" }}
-                  cellSettings={{
-                    border: { width: 0 },
-                    showLabel: true,
-                    enableCellHighlighting: true,
-                    textStyle: {
-                      size: "9px",
-                      fontWeight: "500",
-                    },
-                  }}
-                  cellRender={(args: ICellEventArgs) => {
-                    const sampleIndex = tpmHeatmapData.samples.indexOf(String(args.xLabel));
-                    const geneIndex = tpmHeatmapData.genes.indexOf(String(args.yLabel));
-                    const rawValue =
-                      sampleIndex >= 0 && geneIndex >= 0
-                        ? tpmHeatmapData.rawMatrix[sampleIndex]?.[geneIndex]
-                        : undefined;
+              <div className="overflow-x-auto">
+                <Table hoverable>
+                  <TableHead>
+                    {tableData.headers.map((header) => (
+                      <TableHeadCell
+                        key={header}
+                        onClick={() => handleSort(header)}
+                        className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>{header}</span>
+                          {sortConfig?.key === header &&
+                            (sortConfig.direction === "asc" ? (
+                              <HiChevronUp className="w-4 h-4" />
+                            ) : (
+                              <HiChevronDown className="w-4 h-4" />
+                            ))}
+                        </div>
+                      </TableHeadCell>
+                    ))}
+                  </TableHead>
+                  <TableBody className="divide-y">
+                    {paginatedData.map((row, index) => (
+                      <TableRow key={index}>
+                        {tableData.headers.map((header) => (
+                          <TableCell key={header}>{row[header]}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-                    args.displayText =
-                      typeof rawValue === "number" && Number.isFinite(rawValue)
-                        ? rawValue.toFixed(1)
-                        : "";
-                  }}
-                  tooltipRender={(args: ITooltipEventArgs) => {
-                    const sampleIndex = tpmHeatmapData.samples.indexOf(String(args.xLabel));
-                    const geneIndex = tpmHeatmapData.genes.indexOf(String(args.yLabel));
-                    const rawValue =
-                      sampleIndex >= 0 && geneIndex >= 0
-                        ? tpmHeatmapData.rawMatrix[sampleIndex]?.[geneIndex]
-                        : undefined;
+              <div className="mt-4 flex flex-col items-center justify-between gap-4 sm:flex-row">
+                <div className="text-sm text-gray-700 dark:text-gray-300">
+                  Showing {startRecord} to {endRecord} of {sortedData.length} entries
+                  {searchTerm && <span> (filtered from {tableData.rows.length} total entries)</span>}
+                </div>
 
-                    args.content = [
-                      `Gene: ${args.yLabel}`,
-                      `Sample: ${args.xLabel}`,
-                      `TPM: ${typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue.toFixed(2) : "N/A"}`,
-                      `Heatmap value: ${Number(args.value).toFixed(2)} log2(TPM + 1)`,
-                    ];
-                  }}
-                >
-                  <Inject services={[Legend, Tooltip]} />
-                </HeatMapComponent>
+                <div className="flex gap-2 items-center">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+
+                  <div className="flex gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+
+                      return (
+                        <Button
+                          type="button"
+                          key={pageNum}
+                          size="sm"
+                          color={currentPage === pageNum ? "blue" : "gray"}
+                          onClick={() => setCurrentPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="ml-2 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value={10}>10 / page</option>
+                    <option value={25}>25 / page</option>
+                    <option value={50}>50 / page</option>
+                    <option value={100}>100 / page</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {!loading && tableData.headers.length > 0 && (
+        {!loading && !(tableMode === "tpm" && tpmHeatmapData) && tableData.headers.length > 0 && (
           <div>
             <div className="overflow-x-auto">
               <Table hoverable>
@@ -674,7 +1004,7 @@ export default function TranscriptomePage() {
               </Table>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
+            <div className="mt-4 flex flex-col items-center justify-between gap-4 sm:flex-row">
               <div className="text-sm text-gray-700 dark:text-gray-300">
                 Showing {startRecord} to {endRecord} of {sortedData.length} entries
                 {searchTerm && <span> (filtered from {tableData.rows.length} total entries)</span>}
@@ -839,6 +1169,37 @@ export default function TranscriptomePage() {
             </div>
           )}
 
+          <div className="mb-6 flex flex-wrap gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                FDR Threshold:
+              </label>
+              <select
+                value={analysisFdr}
+                onChange={(e) => setAnalysisFdr(parseFloat(e.target.value))}
+                className="block w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value={0.03}>0.03</option>
+                <option value={0.05}>0.05</option>
+                <option value={0.07}>0.07</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                |log2FC| Threshold:
+              </label>
+              <select
+                value={analysisLogfc}
+                onChange={(e) => setAnalysisLogfc(parseFloat(e.target.value))}
+                className="block w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value={0.5}>0.5</option>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+              </select>
+            </div>
+          </div>
+
           <Button
             type="button"
             onClick={(e) => {
@@ -847,14 +1208,15 @@ export default function TranscriptomePage() {
             }}
             disabled={
               runningAnalysis ||
+              loadingCsv ||
               selectedControl.length === 0 ||
               selectedComparison.length === 0
             }
-            isProcessing={runningAnalysis}
+            isProcessing={runningAnalysis || loadingCsv}
             processingSpinner={<Spinner size="sm" />}
             color="blue"
           >
-            {runningAnalysis ? "Running Analysis..." : "Run Analysis"}
+            {runningAnalysis ? "Running Analysis..." : loadingCsv ? "Loading Results..." : "Run Analysis"}
           </Button>
 
           {(selectedControl.length > 0 || selectedComparison.length > 0) && (
@@ -887,7 +1249,15 @@ export default function TranscriptomePage() {
 
       {(analysisResult || runningAnalysis) && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Analysis Result</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Analysis Result</h3>
+            {analysisResult?.csv_path && (
+              <Button type="button" color="light" onClick={handleDownloadCsv} disabled={loadingCsv}>
+                <HiDownload className="mr-2 h-4 w-4" />
+                Download CSV
+              </Button>
+            )}
+          </div>
 
           {runningAnalysis && (
             <div className="text-center py-8">
@@ -896,7 +1266,14 @@ export default function TranscriptomePage() {
             </div>
           )}
 
-          {analysisResult && (
+          {loadingCsv && (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">正在載入分析結果資料...</p>
+            </div>
+          )}
+
+          {analysisResult && !loadingCsv && (
             <div>
               {analysisResult.cached && (
                 <div className="mb-4 p-3 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-md">
@@ -904,29 +1281,74 @@ export default function TranscriptomePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {analysisResult.volcano_path && (
+              {csvData ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h5 className="text-center text-lg font-medium mb-2 text-gray-900 dark:text-white">Volcano Plot</h5>
-                    <img
-                      src={withCacheBuster(analysisResult.volcano_path)}
-                      alt="Volcano Plot"
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="text-lg font-medium text-gray-900 dark:text-white">Volcano Plot</h5>
+                      <Button
+                        type="button"
+                        size="xs"
+                        color="light"
+                        disabled={loadingCsv}
+                        onClick={() => void handleDownloadPlot(volcanoPlotRef, `${selectedSpecies.backendSpecies}_Volcano`)}
+                      >
+                        <HiDownload className="mr-1 h-3 w-3" />
+                        PNG
+                      </Button>
+                    </div>
+                    <div
+                      ref={volcanoPlotRef}
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                      style={{ minHeight: "450px" }}
                     />
                   </div>
-                )}
 
-                {analysisResult.ma_path && (
                   <div>
-                    <h5 className="text-center text-lg font-medium mb-2 text-gray-900 dark:text-white">MA Plot</h5>
-                    <img
-                      src={withCacheBuster(analysisResult.ma_path)}
-                      alt="MA Plot"
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="text-lg font-medium text-gray-900 dark:text-white">MA Plot</h5>
+                      <Button
+                        type="button"
+                        size="xs"
+                        color="light"
+                        disabled={loadingCsv}
+                        onClick={() => void handleDownloadPlot(maPlotRef, `${selectedSpecies.backendSpecies}_MA`)}
+                      >
+                        <HiDownload className="mr-1 h-3 w-3" />
+                        PNG
+                      </Button>
+                    </div>
+                    <div
+                      ref={maPlotRef}
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                      style={{ minHeight: "450px" }}
                     />
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {analysisResult.volcano_path && (
+                    <div>
+                      <h5 className="text-center text-lg font-medium mb-2 text-gray-900 dark:text-white">Volcano Plot</h5>
+                      <img
+                        src={withCacheBuster(analysisResult.volcano_path)}
+                        alt="Volcano Plot"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                      />
+                    </div>
+                  )}
+                  {analysisResult.ma_path && (
+                    <div>
+                      <h5 className="text-center text-lg font-medium mb-2 text-gray-900 dark:text-white">MA Plot</h5>
+                      <img
+                        src={withCacheBuster(analysisResult.ma_path)}
+                        alt="MA Plot"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

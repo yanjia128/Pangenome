@@ -13,7 +13,9 @@ option_list <- list(
   make_option(c("-c", "--counts"), type="character", default=NULL, help="counts CSV 路徑"),
   make_option(c("-m", "--metadata"), type="character", default=NULL, help="metadata CSV 路徑"),
   make_option(c("-d", "--outdir"), type="character", default="./edgeR_results", help="輸出目錄"),
-  make_option(c("-p", "--prefix"), type="character", default="Vsh", help="檔案前綴")
+  make_option(c("-p", "--prefix"), type="character", default="Vsh", help="檔案前綴"),
+  make_option(c("-f", "--fdr"), type="double", default=0.05, help="FDR 門檻值 (預設: 0.05)"),
+  make_option(c("-l", "--logfc"), type="double", default=1, help="|log2FC| 門檻值 (預設: 1)")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -68,16 +70,16 @@ write.csv(res_table, file=csv_out)
 message(paste("分析完成！結果已存至:", csv_out))
 message(paste("保留基因數:", nrow(y)))
 volcano_data <- res_table %>%
-  mutate(is_significant = ifelse(FDR < 0.05 & abs(logFC) > 1, "Yes", "No"))
+  mutate(is_significant = ifelse(FDR < opt$fdr & abs(logFC) > opt$logfc, "Yes", "No"))
 p1 <- ggplot(volcano_data, aes(x = logFC, y = -log10(FDR), color = is_significant)) +
   geom_point(alpha = 0.6, size = 1.5) +
  theme_minimal() +
  scale_color_manual(values = c("grey", "red")) + 
- labs(title = "Volcano Plot by edgeR(P < 0.05 & |log2FC| > 1)",
+ labs(title = paste0("Volcano Plot by edgeR(P < ", opt$fdr, " & |log2FC| > ", opt$logfc, ")"),
        x = "Log2 Fold Change",
        y = "-Log10 adjust-P") +
-  geom_vline(xintercept = c(-1, 1), linetype = "dashed") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed")
+  geom_vline(xintercept = c(-opt$logfc, opt$logfc), linetype = "dashed") +
+  geom_hline(yintercept = -log10(opt$fdr), linetype = "dashed")
 ggsave(file.path(opt$outdir, paste0(opt$prefix, "_edgeR_Volcano.png")), plot = p1, width = 8, height = 6, dpi = 300)
 message(paste("火山圖已儲存至:", file.path(opt$outdir, paste0(opt$prefix, "_edgeR_Volcano.png"))))
 # 5. 繪製 MA Plot
@@ -87,7 +89,7 @@ p2 <- ggplot(volcano_data, aes(x = logCPM, y = logFC, color = is_significant)) +
   geom_hline(yintercept = 0, color = "black") + 
   theme_minimal() +
   labs(
-    title = "MA Plot by edgeR(P < 0.05 & |log2FC| > 1)",
+    title = paste0("MA Plot by edgeR(P < ", opt$fdr, " & |log2FC| > ", opt$logfc, ")"),
     x = "Average Log2 CPM",
     y = "Log2 Fold Change",
     color = "Significant"

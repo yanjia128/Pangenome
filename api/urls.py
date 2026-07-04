@@ -10,7 +10,7 @@ from .views.publications import (
 )
 
 
-from .views.orthogroups import OrthogroupsEndpoint
+from .views.orthogroups import OrthogroupsEndpoint, OrthogroupFastaDownloadEndpoint
 from .views.gene_trees import GeneTreeListEndpoint, GeneTreeDetailEndpoint
 from .views.diff_gene_analysis import DifferentialExpressionAnalysisEndpoint
 
@@ -22,6 +22,10 @@ urlpatterns = [
     re_path(r"^publications/(?P<slug>[\w\-]+)/$", PublicationEndpoint.as_view()),
     re_path(r"^publications/$", PublicationsEndpoint.as_view()),
     re_path(r"^orthogroups/$", OrthogroupsEndpoint.as_view()),
+    re_path(
+        r"^orthogroups/(?P<orthogroup_id>OG\d+)/download/$",
+        OrthogroupFastaDownloadEndpoint.as_view(),
+    ),
     re_path(r"^gene-trees/$", GeneTreeListEndpoint.as_view()),
     re_path(r"^gene-trees/(?P<tree_id>OG\d+)/$", GeneTreeDetailEndpoint.as_view()),
     re_path(r"^authenticate/$", obtain_auth_token),

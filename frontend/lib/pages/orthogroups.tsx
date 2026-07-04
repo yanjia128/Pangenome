@@ -52,7 +52,7 @@ function CellContent({
 }
 
 function OrthogroupsTable() {
-  const { getOrthogroups } = useApi();
+  const { getOrthogroups, downloadOrthogroupFasta } = useApi();
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [count, setCount] = useState(0);
   const [numPages, setNumPages] = useState(1);
@@ -60,6 +60,7 @@ function OrthogroupsTable() {
   const [search, setSearch] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // Modal 狀態
   const [modalOpen, setModalOpen] = useState(false);
@@ -94,34 +95,27 @@ function OrthogroupsTable() {
   };
 
   const handleDownload = async (orthogroupId: string) => {
-    // 構建檔案路徑 - 使用絕對路徑
-    const filePath = `/rst/Results_Nov26/Orthogroup_Sequences/${orthogroupId}.fa`;
-    
+    setDownloadingId(orthogroupId);
+
     try {
-      // 使用 fetch API 下載檔案
-      const response = await fetch(filePath);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      // 獲取檔案內容
-      const blob = await response.blob();
-      
-      // 創建下載連結
+      const blob = await downloadOrthogroupFasta(orthogroupId);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `${orthogroupId}.fa`;
       document.body.appendChild(link);
       link.click();
-      
-      // 清理
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('下載失敗:', error);
-      alert(`無法下載檔案 ${orthogroupId}.fa\n\n可能原因：\n1. 伺服器尚未重啟（新的 URL 配置未生效）\n2. 檔案不存在\n\n請聯繫管理員或重啟 Django 服務器。`);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Unknown error';
+      alert(`無法下載檔案 ${orthogroupId}.fa\n\n原因：${message}`);
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -130,6 +124,16 @@ function OrthogroupsTable() {
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
         Orthogroups Group Table
       </h2>
+      <div className="overflow-hidden rounded-[28px] border border-rose-100 bg-[radial-gradient(circle_at_top_left,_rgba(244,114,182,0.18),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(253,224,71,0.18),_transparent_24%),linear-gradient(135deg,_#fffdf8_0%,_#fff7fb_45%,_#f7fff8_100%)] p-6 shadow-[0_20px_60px_-30px_rgba(190,24,93,0.35)]">
+        <p className="max-w-8xl text-sm leading-7 text-slate-700">
+          This dataset was generated with{' '}
+          <span className="font-semibold text-rose-700">OrthoFinder</span>. Click an{' '}
+          <span className="font-semibold text-slate-900">Orthogroup ID</span> to explore
+          the phylogenetic tree for that group, and use the{' '}
+          <span className="rounded-full bg-white/80 px-2 py-0.5 font-semibold text-rose-700 shadow-sm">results</span>{' '}
+          link in each column to view the full gene list.
+        </p>
+      </div>
 
       <div className="flex items-center gap-2 max-w-lg">
         <TextInput
@@ -177,8 +181,9 @@ function OrthogroupsTable() {
                               </Link>
                               <button
                                 onClick={() => handleDownload(String(row[key] ?? ''))}
-                                className="p-1 text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                                className="p-1 text-gray-600 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
                                 title="下載 FASTA 檔案"
+                                disabled={downloadingId === String(row[key] ?? '')}
                               >
                                 <HiDownload className="w-5 h-5" />
                               </button>
