@@ -7,7 +7,6 @@ export enum ROUTES {
   BLOG = "/blog",
   PUBLICATION_PAGE = "/blog/:publication",
   ORTHOGROUPS = "/orthogroups",
-  PHYLOXONIUM = "/phyloxonium",
   PHYLOCANVAS = "/phylocanvas",
   TRANSCRIPTOME = "/transcriptome",
   ENRICHMENT = "/enrichment",

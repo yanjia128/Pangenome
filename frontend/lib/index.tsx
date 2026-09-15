@@ -108,16 +108,6 @@ export function Root() {
           }
         />
         <Route
-          path={ROUTES.PHYLOXONIUM}
-          element={
-            <div className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">
-              <Suspense fallback={<FullScreenLoading />}>
-                <PhyloxoniumPage />
-              </Suspense>
-            </div>
-          }
-        />
-        <Route
           path={ROUTES.TRANSCRIPTOME}
           element={
             <div className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">

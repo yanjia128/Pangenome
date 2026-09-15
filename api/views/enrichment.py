@@ -19,7 +19,7 @@ SPECIES_GENE_COUNT = {
     "Dbullenianum": 21913,
     "Dcariniferum": 25057,
     "Dexile": 22487,
-    "Dlindleyi": 29446,  #從gff抓出基因數為29,446，eggnog基因數為21372
+    "Dlindleyi": 29446,  # 從gff抓出基因數為29,446，eggnog基因數為21372
     "Dnobile": 24645,
     "Dparcum": 24777,
     "Dporphyrochilum": 25812,
@@ -81,8 +81,10 @@ def _load_domain_data(species, domain):
         if df.empty:
             return {}, {}, []
 
-        df["_genes_list"] = df["Genes"].fillna("").apply(
-            lambda s: [g.strip() for g in s.split(",") if g.strip()]
+        df["_genes_list"] = (
+            df["Genes"]
+            .fillna("")
+            .apply(lambda s: [g.strip() for g in s.split(",") if g.strip()])
         )
         search_dict = dict(zip(df["Query ID"], df["_genes_list"]))
         desc_dict = dict(zip(df["Query ID"], df["Description"].fillna("")))
@@ -162,7 +164,9 @@ def _run_enrichment_unified(species, user_input, alpha, correction_method):
         )
         df_res["expected_ratio"] = df_res.apply(
             lambda r: "{}/{} ({:.2f}%)".format(
-                r["n_target"], n_total_genes, (float(r["n_target"]) / n_total_genes * 100)
+                r["n_target"],
+                n_total_genes,
+                (float(r["n_target"]) / n_total_genes * 100),
             )
             if n_total_genes
             else "0/0",
@@ -230,7 +234,9 @@ class EnrichmentAnalysisEndpoint(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            results = _run_enrichment_unified(species, user_input, alpha, correction_method)
+            results = _run_enrichment_unified(
+                species, user_input, alpha, correction_method
+            )
             return Response(results, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(

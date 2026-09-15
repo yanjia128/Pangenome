@@ -72,9 +72,7 @@ class GeneAnnotationEndpoint(APIView):
         columns_sql = ", ".join(COLUMN_ORDER)
 
         with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT {columns_sql} FROM {table_name} ORDER BY gene_id"
-            )
+            cursor.execute(f"SELECT {columns_sql} FROM {table_name} ORDER BY gene_id")
             rows = cursor.fetchall()
 
         result_rows = [

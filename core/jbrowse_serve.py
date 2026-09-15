@@ -1,4 +1,9 @@
-from django.http import FileResponse, Http404, HttpResponseNotModified, StreamingHttpResponse
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpResponseNotModified,
+    StreamingHttpResponse,
+)
 from django.utils.http import http_date, parse_http_date_safe
 from pathlib import Path
 
