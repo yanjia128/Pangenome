@@ -145,3 +145,49 @@ export async function loadKsData(): Promise<KsData> {
   }
   return KS_DATA as KsData;
 }
+
+export type EnrichmentDomainKey = "GO" | "Pathway" | "pfam";
+
+export type EnrichmentRow = {
+  target: string;
+  description: string;
+  "p-value": number;
+  observed_ratio: string;
+  expected_ratio: string;
+  fold_enrichment: number | null;
+  count: number;
+};
+
+export type EnrichmentResponse = Partial<Record<EnrichmentDomainKey, EnrichmentRow[]>> & {
+  error?: string;
+};
+
+export type EnrichmentPValueOption = 0.05 | 0.01 | 0.001;
+export type EnrichmentCorrectionMethod = "None" | "FDR" | "Bonferroni";
+
+export const ENRICHMENT_DOMAINS: EnrichmentDomainKey[] = ["GO", "Pathway", "pfam"];
+
+export const ENRICHMENT_DOMAIN_LABELS: Record<EnrichmentDomainKey, string> = {
+  GO: "GO",
+  Pathway: "Pathway",
+  pfam: "Pfam",
+};
+
+export type EnrichmentSortConfig = { key: keyof EnrichmentRow; direction: "asc" | "desc" } | null;
+export type EnrichmentDomainTableState = {
+  search: string;
+  sortConfig: EnrichmentSortConfig;
+  page: number;
+};
+
+export function defaultEnrichmentDomainTableState(): EnrichmentDomainTableState {
+  return { search: "", sortConfig: null, page: 1 };
+}
+
+export function defaultEnrichmentDomainTableStates(): Record<EnrichmentDomainKey, EnrichmentDomainTableState> {
+  return {
+    GO: defaultEnrichmentDomainTableState(),
+    Pathway: defaultEnrichmentDomainTableState(),
+    pfam: defaultEnrichmentDomainTableState(),
+  };
+}

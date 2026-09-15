@@ -1,21 +1,27 @@
 import os
 import re
 
-import pandas as pd
-from django.core.paginator import Paginator
+from django.core.cache import cache
+from django.db import connection
 from django.http import FileResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-ORTHOGROUPS_PATH = (
-    "/home/user/Orchid/Pangenome/rst/Results_Nov26/Orthogroups/Orthogroups.tsv"
-)
+ORTHOGROUP_TABLE = "orthogroup_26"
 ORTHOGROUP_FASTA_DIR = (
     "/home/user/Orchid/Pangenome/rst/Results_Nov26/Orthogroup_Sequences"
 )
 VALID_ORTHOGROUP_ID_RE = re.compile(r"^OG\d+$")
+
+ORTHOGROUP_COLUMNS_CACHE_KEY = "orthogroup_26_columns"
+
+
+def _load_orthogroup_columns():
+    with connection.cursor() as cursor:
+        cursor.execute(f"SELECT * FROM {ORTHOGROUP_TABLE} LIMIT 0")
+        return [col.name for col in cursor.description]
 
 
 class OrthogroupsEndpoint(APIView):
@@ -26,24 +32,43 @@ class OrthogroupsEndpoint(APIView):
         page_size = int(request.GET.get("page_size", 20))
         search = request.GET.get("search", "").strip()
 
-        df = pd.read_csv(ORTHOGROUPS_PATH, sep="\t", low_memory=False)
-        # Replace NaN values with empty string for JSON compatibility
-        df = df.fillna("")
+        columns = cache.get_or_set(
+            ORTHOGROUP_COLUMNS_CACHE_KEY, _load_orthogroup_columns, timeout=None
+        )
+        columns_sql = ", ".join(columns)
+
+        where_sql = ""
+        params = []
         if search:
-            df = df[
-                df.apply(
-                    lambda row: row.astype(str).str.contains(search, case=False).any(),
-                    axis=1,
-                )
-            ]
-        paginator = Paginator(df.to_dict(orient="records"), page_size)
-        page_obj = paginator.get_page(page)
+            like_clauses = " OR ".join(f"{col}::text ILIKE %s" for col in columns)
+            where_sql = f"WHERE {like_clauses}"
+            params = [f"%{search}%"] * len(columns)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT count(*) FROM {ORTHOGROUP_TABLE} {where_sql}", params
+            )
+            count = cursor.fetchone()[0]
+
+            offset = (page - 1) * page_size
+            cursor.execute(
+                f"SELECT {columns_sql} FROM {ORTHOGROUP_TABLE} {where_sql} "
+                f"ORDER BY orthogroup LIMIT %s OFFSET %s",
+                params + [page_size, offset],
+            )
+            rows = cursor.fetchall()
+
+        num_pages = max(1, -(-count // page_size)) if page_size else 1
+        results = [
+            {col: ("" if value is None else value) for col, value in zip(columns, row)}
+            for row in rows
+        ]
 
         return Response(
             {
-                "count": paginator.count,
-                "num_pages": paginator.num_pages,
-                "results": list(page_obj),
+                "count": count,
+                "num_pages": num_pages,
+                "results": results,
             },
             status=status.HTTP_200_OK,
         )

@@ -450,6 +450,7 @@ function HomePage() {
       PLOT_CONFIG
     );
 
+    /* PCA — Gene Presence/Absence chart disabled
     void plotly.newPlot(
       CHART_IDS[4],
       [
@@ -487,6 +488,7 @@ function HomePage() {
       },
       PLOT_CONFIG
     );
+    */
 
     void plotly.newPlot(
       CHART_IDS[5],
@@ -722,6 +724,7 @@ function HomePage() {
         </div>
       </div>
 
+      {/* PCA — Gene Presence/Absence section disabled
       <div className="pa-section-title">PCA — Gene Presence/Absence</div>
       <div className="pa-card">
         <div className="pa-card-header">
@@ -731,6 +734,7 @@ function HomePage() {
           <div id={CHART_IDS[4]} className="pa-chart" />
         </div>
       </div>
+      */}
 
       <div className="pa-section-title">Gene Duplication Events</div>
       <div className="pa-card">

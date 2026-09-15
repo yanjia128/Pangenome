@@ -18,6 +18,111 @@
 - Memcached：快取，主要用於 production 設定
 - JBrowse：基因組瀏覽器，可由 Django 或獨立 HTTP server 提供
 
+## 系統架構圖
+
+```mermaid
+flowchart TD
+    User(("使用者瀏覽器"))
+
+    subgraph FE["Frontend — React + TypeScript (webpack)"]
+        Router("React Router")
+        Pages("Tab Pages")
+        ApiClient("API Client\n(lib/api/use-api.ts)")
+        Config("Env / config.ts\napiBaseUrl, authToken")
+    end
+
+    subgraph Core["Django Core (core/urls.py)"]
+        UrlRouter{"URL Router"}
+        SpaHandler("frontend.views\nspa_and_admin_handler → index.html")
+        StaticServe("static / media / rst\nDjango serve()")
+        JbrowseServe("core.jbrowse_serve\nserve_jbrowse()")
+        Admin("Django Admin")
+    end
+
+    subgraph API["REST API — DRF (api/urls.py)"]
+        AuthEP("authenticate/\nToken Auth")
+        PubEP("publications/*")
+        SubEP("subscribers/")
+        OrthoEP("orthogroups/*\n+ FASTA download")
+        GeneTreeEP("gene-trees/*")
+        DiffEP("differential-expression/\n(POST)")
+        EnrichEP("enrichment/*\n(POST)")
+    end
+
+    subgraph Backend["Backend 處理邏輯"]
+        Models("Django Models\nPublication / Subscriber")
+        RRunner("backend/R/run_deg.py\nDESEQ2Runner / EDGERRunner")
+        RScripts("Rscript subprocess\ndeseq2.R / edgeR.R")
+        EnrichLogic("api/views/enrichment.py\nFisher's exact test\n+ FDR/Bonferroni correction")
+    end
+
+    subgraph Storage["資料儲存 / 靜態檔案"]
+        RstFiles[["Local files:\nOrthogroups.tsv, Orthogroup_Sequences/,\nGene_Trees/"]]
+        Memcached[("Memcached\ntimeout=None")]
+        EnrichCsv[["api/data/enrichment/\n*_AnnotationBrowser.csv"]]
+        Postgres[("PostgreSQL")]
+        CountTables[["backend/R/Data/table/\n*_counts.csv"]]
+        DgaOutput[["frontend/public/Data/DGA/\nvolcano / MA plots"]]
+        JbrowseStatic[["JBrowse2_MultiWay/\n(靜態基因組瀏覽器)"]]
+    end
+
+    SeqServer("外部連結：SequenceServer\nwindow.open() 開新分頁")
+
+    User -- HTTP --> UrlRouter
+    UrlRouter -- "/admin" --> Admin
+    UrlRouter -- "/dendrobium/api/*" --> API
+    UrlRouter -- "/static /media /rst" --> StaticServe --> RstFiles
+    UrlRouter -- "/dendrobium/SyntneyViewer/*" --> JbrowseServe --> JbrowseStatic
+    UrlRouter -- "/ 及各 SPA 路由" --> SpaHandler --> Pages
+
+    Pages --> Router
+    Router --> ApiClient
+    Config -.->|"注入 baseURL / Token"| ApiClient
+    ApiClient -- "fetch + Authorization: Token" --> API
+
+    Pages -- "Syntney Portal 按鈕" --> JbrowseStatic
+    Pages -- "BLAST Portal 按鈕" --> SeqServer
+
+    AuthEP -.-> Models
+    PubEP -.-> Models
+    SubEP -.-> Models
+    Models -.-> Postgres
+
+    OrthoEP -- "cache.get_or_set\n('orthogroups_records')" --> Memcached
+    OrthoEP -. "cache miss → pandas.read_csv" .-> RstFiles
+
+    GeneTreeEP -- "cache.get_or_set\n('gene_tree_filenames' /\n'gene_tree_{id}')" --> Memcached
+    GeneTreeEP -. "cache miss → os.listdir / open()" .-> RstFiles
+
+    DiffEP --> RRunner --> RScripts
+    RScripts -- "讀取" --> CountTables
+    RScripts -- "輸出圖檔" --> DgaOutput
+    DiffEP -.->|"回傳圖檔路徑"| DgaOutput
+
+    EnrichEP --> EnrichLogic
+    EnrichLogic -- "cache.get_or_set\n('enrichment_domain_{species}_{domain}')" --> Memcached
+    EnrichLogic -. "cache miss → pandas.read_csv" .-> EnrichCsv
+```
+
+### 快取策略（Memcached cache-aside）
+
+三個原本「每次請求都重新讀大檔案」的端點，目前都改成 cache-aside 模式，`timeout=None`（不過期，除非手動清除）：
+
+| 端點 | Cache Key | 快取內容 | 原始資料來源 |
+| --- | --- | --- | --- |
+| `orthogroups/` | `orthogroups_records` | 整份 `Orthogroups.tsv` 解析後的 records | `RstFiles`（`pandas.read_csv`） |
+| `gene-trees/` | `gene_tree_filenames` | `Gene_Trees/` 目錄檔名清單 | `RstFiles`（`os.listdir`） |
+| `gene-trees/<id>/` | `gene_tree_{id}` | 單棵樹的 Newick 字串 | `RstFiles`（單檔 `open()`） |
+| `enrichment/`（各 domain） | `enrichment_domain_{species}_{domain}` | 解析後的 `search_dict` / `targets`（7 物種 × 4 domain = 28 組） | `EnrichCsv`（`pandas.read_csv`） |
+
+這些資料都是分析結果（OrthoFinder / 富集註解），除非重新跑分析否則不會變動，因此可以永久快取。若重新產生了這些檔案，需要手動執行：
+
+```bash
+python manage.py clearcache
+```
+
+來清空 Memcached，讓下一次請求重新讀取新檔案。
+
 ## Port 與路徑對照
 
 | 元件 | 預設位址 | 用途 |

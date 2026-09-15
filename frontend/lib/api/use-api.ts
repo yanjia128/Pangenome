@@ -6,9 +6,12 @@ import {
   getPaginatedFilteredPublicationsEndoint,
   getOrthogroupsEndpoint,
   getOrthogroupFastaDownloadEndpoint,
+  getAnnotationEndpoint,
   getGeneTreesEndpoint,
   getGeneTreeDetailEndpoint,
   getDifferentialExpressionEndpoint,
+  getEnrichmentAnalysisEndpoint,
+  getEnrichmentExampleGenesEndpoint,
 } from "./utils";
 import { getSecrets } from "../config";
 import type { GetPaginatedPublicationsResponse, Publication } from "./types";
@@ -183,6 +186,30 @@ export function useApi() {
     return response.blob();
   }
 
+  async function getGeneAnnotation(
+    species: string
+  ): Promise<{ headers: string[]; rows: string[][] }> {
+    const params = new URLSearchParams({ species });
+    const query = `?${params.toString()}`;
+    const endpoint = isProd
+      ? getAnnotationEndpoint + query
+      : apiBaseUrl + getAnnotationEndpoint + query;
+
+    return fetch(endpoint, {
+      cache: "default",
+      method: "GET",
+      headers: getHeaders,
+    })
+      .then((response): Promise<{ headers: string[]; rows: string[][] }> => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .catch((error) => {
+        console.error(error);
+        return { headers: [] as string[], rows: [] as string[][] };
+      });
+  }
+
   async function getGeneTreeList(args?: {
     page?: number;
     page_size?: number;
@@ -278,14 +305,72 @@ export function useApi() {
       });
   }
 
+  async function submitEnrichmentAnalysis(payload: {
+    species: string;
+    input: string;
+    p_value: number;
+    correctionMethod: "None" | "FDR" | "Bonferroni";
+  }): Promise<Record<string, unknown>> {
+    const endpoint = isProd
+      ? getEnrichmentAnalysisEndpoint
+      : apiBaseUrl + getEnrichmentAnalysisEndpoint;
+
+    return fetch(endpoint, {
+      cache: "no-cache",
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(getHeaders.entries()),
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(payload),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          return { error: data?.error ?? `HTTP ${response.status}` };
+        }
+        return data;
+      })
+      .catch((error) => {
+        console.error(error);
+        return { error: "Enrichment analysis request failed." };
+      });
+  }
+
+  async function getEnrichmentExampleGenes(
+    species: string
+  ): Promise<{ geneList: string[]; error?: string }> {
+    const endpoint = isProd
+      ? getEnrichmentExampleGenesEndpoint
+      : apiBaseUrl + getEnrichmentExampleGenesEndpoint;
+
+    return fetch(endpoint, {
+      cache: "no-cache",
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(getHeaders.entries()),
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({ species }),
+    })
+      .then((response) => response.json() as Promise<{ geneList: string[]; error?: string }>)
+      .catch((error) => {
+        console.error(error);
+        return { geneList: [] as string[], error: "Failed to fetch example genes." };
+      });
+  }
+
   return {
     getPublications,
     getPaginatedPublications,
     getPublication,
     getOrthogroups,
     downloadOrthogroupFasta,
+    getGeneAnnotation,
     getGeneTreeList,
     getGeneTree,
     submitDifferentialExpression,
+    submitEnrichmentAnalysis,
+    getEnrichmentExampleGenes,
   };
 }

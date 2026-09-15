@@ -48,3 +48,9 @@ frontend/public/Data
 #logs/
 logs/
 .dev.pid
+
+# docs/
+docs/
+
+#disabled yml
+.disabled

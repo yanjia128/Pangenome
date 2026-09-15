@@ -11,8 +11,10 @@ from .views.publications import (
 
 
 from .views.orthogroups import OrthogroupsEndpoint, OrthogroupFastaDownloadEndpoint
+from .views.annotation import GeneAnnotationEndpoint
 from .views.gene_trees import GeneTreeListEndpoint, GeneTreeDetailEndpoint
 from .views.diff_gene_analysis import DifferentialExpressionAnalysisEndpoint
+from .views.enrichment import EnrichmentAnalysisEndpoint, EnrichmentExampleGenesEndpoint
 
 urlpatterns = [
     re_path(r"^subscribers/$", SubscribersEndpoint.as_view()),
@@ -26,6 +28,7 @@ urlpatterns = [
         r"^orthogroups/(?P<orthogroup_id>OG\d+)/download/$",
         OrthogroupFastaDownloadEndpoint.as_view(),
     ),
+    re_path(r"^annotation/$", GeneAnnotationEndpoint.as_view()),
     re_path(r"^gene-trees/$", GeneTreeListEndpoint.as_view()),
     re_path(r"^gene-trees/(?P<tree_id>OG\d+)/$", GeneTreeDetailEndpoint.as_view()),
     re_path(r"^authenticate/$", obtain_auth_token),
@@ -33,5 +36,15 @@ urlpatterns = [
         r"^differential-expression/$",
         DifferentialExpressionAnalysisEndpoint.as_view(),
         name="differential_expression",
+    ),
+    re_path(
+        r"^enrichment/$",
+        EnrichmentAnalysisEndpoint.as_view(),
+        name="enrichment_analysis",
+    ),
+    re_path(
+        r"^enrichment/example-genes/$",
+        EnrichmentExampleGenesEndpoint.as_view(),
+        name="enrichment_example_genes",
     ),
 ]

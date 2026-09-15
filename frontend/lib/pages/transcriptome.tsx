@@ -13,7 +13,20 @@ import {
 } from "flowbite-react";
 import { HeatMapComponent, Inject, Legend, Tooltip, type ITooltipEventArgs, type ICellEventArgs } from "@syncfusion/ej2-react-heatmap";
 import { HiSearch, HiChevronUp, HiChevronDown, HiDownload } from "react-icons/hi";
-import { loadPlotly, type PlotlyLike } from "./pangenome-data";
+import {
+  loadPlotly,
+  type PlotlyLike,
+  ENRICHMENT_DOMAINS,
+  ENRICHMENT_DOMAIN_LABELS,
+  defaultEnrichmentDomainTableState,
+  defaultEnrichmentDomainTableStates,
+  type EnrichmentDomainKey,
+  type EnrichmentRow,
+  type EnrichmentResponse,
+  type EnrichmentPValueOption,
+  type EnrichmentCorrectionMethod,
+  type EnrichmentDomainTableState,
+} from "./pangenome-data";
 import { registerLicense } from '@syncfusion/ej2-base';
 registerLicense('Ngo9BigBOggjHTQxAR8/V1JHaF1cXmhOYVBpR2NbeU5xdl9HaFZTTGY/P1ZhSXxVdkNjWn5ccXxWRWhdWEx9XEE=');
 type SpeciesOption = {
@@ -104,6 +117,21 @@ const SPECIES_OPTIONS: SpeciesOption[] = [
   },
 ];
 
+// Enrichment analysis keys species by their full name (matching api/data/enrichment/<name>),
+// while transcriptome samples use short codes.
+const ENRICHMENT_SPECIES_MAP: Partial<Record<string, string>> = {
+  Dbullen: "Dbullenianum",
+  Dcar: "Dcariniferum",
+  Dexile: "Dexile",
+  Dlindle: "Dlindleyi",
+  Dnobile: "Dnobile",
+  Dparcum: "Dparcum",
+  Dporphy: "Dporphyrochilum",
+  Dsecund: "Dsecundum",
+};
+
+const ENRICHMENT_PAGE_SIZE = 25;
+
 function parseTsv(tsvText: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = tsvText
     .split(/\r?\n/)
@@ -125,6 +153,36 @@ function parseTsv(tsvText: string): { headers: string[]; rows: Record<string, st
   });
 
   return { headers, rows };
+}
+
+const TISSUE_KEYWORDS = ["Leaf", "Root", "Stem", "Flower"];
+
+function getTissueGroup(header: string): string {
+  const match = header.match(/_(Leaf|Root|Stem|Flower)_/i);
+  if (!match) return header;
+  const canonical = TISSUE_KEYWORDS.find(
+    (tissue) => tissue.toLowerCase() === match[1].toLowerCase()
+  );
+  return canonical ?? match[1];
+}
+
+// Groups sample columns by tissue type first, keeping each tissue's
+// original (replicate-ascending) order intact, per user request to sort
+// columns "組織優先、重複組其次" instead of interleaved by replicate.
+function reorderColumnsByTissue(sampleColumns: string[]): string[] {
+  const order: string[] = [];
+  const groups = new Map<string, string[]>();
+
+  sampleColumns.forEach((column) => {
+    const tissue = getTissueGroup(column);
+    if (!groups.has(tissue)) {
+      groups.set(tissue, []);
+      order.push(tissue);
+    }
+    groups.get(tissue)!.push(column);
+  });
+
+  return order.flatMap((tissue) => groups.get(tissue)!);
 }
 
 function withCacheBuster(url: string): string {
@@ -209,7 +267,7 @@ function buildTpmHeatmapData(
 }
 
 export default function TranscriptomePage() {
-  const { submitDifferentialExpression } = useApi();
+  const { submitDifferentialExpression, submitEnrichmentAnalysis } = useApi();
   const heatmapRef = useRef<HeatMapComponent | null>(null);
 
   const handleHeatmapRef = (instance: HeatMapComponent | null) => {
@@ -249,6 +307,18 @@ export default function TranscriptomePage() {
   const volcanoPlotRef = useRef<HTMLDivElement | null>(null);
   const maPlotRef = useRef<HTMLDivElement | null>(null);
   const plotlyRef = useRef<PlotlyLike | null>(null);
+  const enrichmentBubblePlotRef = useRef<HTMLDivElement | null>(null);
+  const enrichmentVolcanoPlotRef = useRef<HTMLDivElement | null>(null);
+
+  const [enrichmentPValue, setEnrichmentPValue] = useState<EnrichmentPValueOption>(0.05);
+  const [enrichmentCorrection, setEnrichmentCorrection] = useState<EnrichmentCorrectionMethod>("FDR");
+  const [enrichmentRunning, setEnrichmentRunning] = useState(false);
+  const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResponse | null>(null);
+  const [enrichmentError, setEnrichmentError] = useState("");
+  const [enrichmentActiveDomain, setEnrichmentActiveDomain] = useState<EnrichmentDomainKey | null>(null);
+  const [enrichmentDomainTableState, setEnrichmentDomainTableState] = useState<
+    Record<EnrichmentDomainKey, EnrichmentDomainTableState>
+  >(defaultEnrichmentDomainTableStates());
 
   const getMethodBySelection = useCallback(
     (controlCount: number, comparisonCount: number): DiffMethod =>
@@ -343,8 +413,8 @@ export default function TranscriptomePage() {
 
           const volcanoLayout: Record<string, unknown> = {
             title: `Volcano Plot (${method}) — P < ${analysisFdr} & |log2FC| > ${analysisLogfc}`,
-            xaxis: { title: "Log2 Fold Change" },
-            yaxis: { title: "-Log10(adjusted P)" },
+            xaxis: { title: "log2(Fold Change)", automargin: true },
+            yaxis: { title: "-log(FDR)", automargin: true },
             shapes: [
               { type: "line", x0: -analysisLogfc, x1: -analysisLogfc, y0: 0, y1: 1, yref: "paper", line: { dash: "dash", color: "black", width: 1 } },
               { type: "line", x0: analysisLogfc, x1: analysisLogfc, y0: 0, y1: 1, yref: "paper", line: { dash: "dash", color: "black", width: 1 } },
@@ -357,7 +427,7 @@ export default function TranscriptomePage() {
         }
 
         if (maPlotRef.current) {
-          const xAxisTitle = isEdgeR ? "Average Log2 CPM" : "log10(Mean Expression)";
+          const xAxisTitle = "log10(Mean Express)";
           const maHover = `Gene: %{text}<br>${xAxisTitle}: %{x:.2f}<br>log2FC: %{y:.2f}<extra></extra>`;
 
           const pick = (arr: number[], idx: number[]) => idx.map(i => arr[i]);
@@ -395,8 +465,8 @@ export default function TranscriptomePage() {
 
           const maLayout: Record<string, unknown> = {
             title: `MA Plot (${method}) — P < ${analysisFdr} & |log2FC| > ${analysisLogfc}`,
-            xaxis: { title: xAxisTitle },
-            yaxis: { title: "Log2 Fold Change" },
+            xaxis: { title: xAxisTitle, automargin: true },
+            yaxis: { title: "log2(Fold Change)", automargin: true },
             shapes: [
               { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "black", width: 1 } },
             ],
@@ -417,6 +487,281 @@ export default function TranscriptomePage() {
       }
     };
   }, [csvData, analysisResult, analysisFdr, analysisLogfc, analysisMethod]);
+
+  const enrichmentSpeciesName = ENRICHMENT_SPECIES_MAP[selectedSpecies.backendSpecies];
+
+  const significantGenes = useMemo(() => {
+    if (!csvData || !analysisResult || csvData.length === 0) return [];
+
+    const method = analysisResult.method ?? analysisMethod;
+    const isEdgeR = method === "edgeR";
+    const fcCol = isEdgeR ? "logFC" : "log2FoldChange";
+    const pCol = isEdgeR ? "FDR" : "padj";
+    const geneCol = Object.keys(csvData[0])[0];
+
+    const genes: string[] = [];
+    for (const row of csvData) {
+      const fcVal = parseFloat(row[fcCol]);
+      const pVal = parseFloat(row[pCol]);
+      if (isNaN(fcVal) || isNaN(pVal)) continue;
+      if (pVal < analysisFdr && Math.abs(fcVal) > analysisLogfc) {
+        const gene = row[geneCol];
+        if (gene) genes.push(gene);
+      }
+    }
+    return genes;
+  }, [csvData, analysisResult, analysisMethod, analysisFdr, analysisLogfc]);
+
+  const handleRunEnrichment = async () => {
+    if (!enrichmentSpeciesName || significantGenes.length === 0) return;
+
+    setEnrichmentRunning(true);
+    setEnrichmentError("");
+    setEnrichmentResult(null);
+    setEnrichmentActiveDomain(null);
+    setEnrichmentDomainTableState(defaultEnrichmentDomainTableStates());
+
+    try {
+      const response = (await submitEnrichmentAnalysis({
+        species: enrichmentSpeciesName,
+        input: significantGenes.join(","),
+        p_value: enrichmentPValue,
+        correctionMethod: enrichmentCorrection,
+      })) as EnrichmentResponse;
+
+      if (response.error) {
+        setEnrichmentError(response.error);
+        return;
+      }
+
+      setEnrichmentResult(response);
+      const firstDomain = ENRICHMENT_DOMAINS.find((domain) => (response[domain]?.length ?? 0) > 0);
+      setEnrichmentActiveDomain(firstDomain ?? ENRICHMENT_DOMAINS[0]);
+    } catch (error) {
+      setEnrichmentError(error instanceof Error ? error.message : "富集分析失敗，請稍後再試。");
+    } finally {
+      setEnrichmentRunning(false);
+    }
+  };
+
+  const enrichmentDomainsWithResults = useMemo(() => {
+    if (!enrichmentResult) return [];
+    return ENRICHMENT_DOMAINS.filter((domain) => (enrichmentResult[domain]?.length ?? 0) > 0);
+  }, [enrichmentResult]);
+
+  const enrichmentActiveRows = useMemo(() => {
+    if (!enrichmentResult || !enrichmentActiveDomain) return [];
+    return enrichmentResult[enrichmentActiveDomain] ?? [];
+  }, [enrichmentResult, enrichmentActiveDomain]);
+
+  useEffect(() => {
+    if (!enrichmentActiveDomain || enrichmentActiveRows.length === 0) {
+      return;
+    }
+
+    const rows = enrichmentActiveRows;
+    const domainLabel = ENRICHMENT_DOMAIN_LABELS[enrichmentActiveDomain];
+    const pThreshold = -Math.log10(enrichmentPValue);
+
+    void (async () => {
+      try {
+        const Plotly = plotlyRef.current ?? (await loadPlotly());
+        plotlyRef.current = Plotly;
+
+        if (enrichmentBubblePlotRef.current) {
+          const bubbleRows = [...rows]
+            .sort((a, b) => b["p-value"] - a["p-value"])
+            .slice(0, 20)
+            .reverse();
+          const maxCount = Math.max(...bubbleRows.map((r) => r.count), 1);
+
+          const truncateLabel = (label: string, max = 50) =>
+            label.length > max ? `${label.slice(0, max - 1)}…` : label;
+
+          const bubbleTrace = [
+            {
+              x: bubbleRows.map((r) => r.fold_enrichment ?? 0),
+              y: bubbleRows.map((r) => truncateLabel(r.description || r.target)),
+              mode: "markers",
+              type: "scatter",
+              marker: {
+                size: bubbleRows.map((r) => r.count),
+                sizemode: "area",
+                sizeref: (2 * maxCount) / 40 ** 2,
+                sizemin: 4,
+                color: bubbleRows.map((r) => r["p-value"]),
+                colorscale: "YlOrRd",
+                showscale: true,
+                colorbar: { title: "-log10(p)" },
+                line: { color: "rgba(0,0,0,0.2)", width: 1 },
+              },
+              text: bubbleRows.map((r) => `${r.target}: ${r.description ?? ""}`),
+              hovertemplate:
+                "%{text}<br>log2(Fold Enrichment): %{x:.2f}<br>Count: %{marker.size}<extra></extra>",
+            },
+          ];
+
+          const bubbleLayout: Record<string, unknown> = {
+            title: `${domainLabel} Bubble Plot (Top ${bubbleRows.length})`,
+            xaxis: { title: "log2(Fold Enrichment)" },
+            yaxis: { automargin: true },
+            margin: { t: 50, b: 50, l: 320, r: 30 },
+            height: Math.max(360, bubbleRows.length * 28),
+          };
+
+          await Plotly.newPlot(enrichmentBubblePlotRef.current, bubbleTrace, bubbleLayout, {
+            responsive: true,
+          });
+        }
+
+        if (enrichmentVolcanoPlotRef.current) {
+          const fc = rows.map((r) => r.fold_enrichment ?? 0);
+          const pvals = rows.map((r) => r["p-value"]);
+          const targets = rows.map((r) => r.target);
+
+          const upIdx = fc
+            .map((f, i) => (pvals[i] > pThreshold && f > 0 ? i : -1))
+            .filter((i) => i >= 0);
+          const downIdx = fc
+            .map((f, i) => (pvals[i] > pThreshold && f < 0 ? i : -1))
+            .filter((i) => i >= 0);
+          const significantIdx = new Set([...upIdx, ...downIdx]);
+          const nsIdx = fc.map((_, i) => i).filter((i) => !significantIdx.has(i));
+
+          const pick = (arr: number[], idx: number[]) => idx.map((i) => arr[i]);
+          const pickStr = (arr: string[], idx: number[]) => idx.map((i) => arr[i]);
+          const hover =
+            "Term: %{text}<br>log2(Fold Enrichment): %{x:.2f}<br>-log10(p): %{y:.2f}<extra></extra>";
+
+          const volcanoTraces = [
+            {
+              name: "Not significant",
+              x: pick(fc, nsIdx),
+              y: pick(pvals, nsIdx),
+              mode: "markers",
+              type: "scatter",
+              marker: { color: "grey", size: 6, opacity: 0.4 },
+              text: pickStr(targets, nsIdx),
+              hovertemplate: hover,
+            },
+            {
+              name: "Enriched",
+              x: pick(fc, upIdx),
+              y: pick(pvals, upIdx),
+              mode: "markers",
+              type: "scatter",
+              marker: { color: "red", size: 7, opacity: 0.75 },
+              text: pickStr(targets, upIdx),
+              hovertemplate: hover,
+            },
+            {
+              name: "Depleted",
+              x: pick(fc, downIdx),
+              y: pick(pvals, downIdx),
+              mode: "markers",
+              type: "scatter",
+              marker: { color: "blue", size: 7, opacity: 0.75 },
+              text: pickStr(targets, downIdx),
+              hovertemplate: hover,
+            },
+          ];
+
+          const volcanoLayout: Record<string, unknown> = {
+            title: `${domainLabel} Volcano Plot — P < ${enrichmentPValue}`,
+            xaxis: { title: "log2(Fold Enrichment)", automargin: true },
+            yaxis: { title: "-log10(p-value)", automargin: true },
+            shapes: [
+              {
+                type: "line",
+                x0: 0,
+                x1: 1,
+                xref: "paper",
+                y0: pThreshold,
+                y1: pThreshold,
+                line: { dash: "dash", color: "black", width: 1 },
+              },
+            ],
+            margin: { t: 50, b: 50, l: 60, r: 30 },
+          };
+
+          await Plotly.newPlot(enrichmentVolcanoPlotRef.current, volcanoTraces, volcanoLayout, {
+            responsive: true,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to render enrichment plots:", err);
+      }
+    })();
+
+    return () => {
+      if (plotlyRef.current) {
+        if (enrichmentBubblePlotRef.current) plotlyRef.current.purge(enrichmentBubblePlotRef.current);
+        if (enrichmentVolcanoPlotRef.current) plotlyRef.current.purge(enrichmentVolcanoPlotRef.current);
+      }
+    };
+  }, [enrichmentActiveRows, enrichmentActiveDomain, enrichmentPValue]);
+
+  const enrichmentActiveTableState = enrichmentActiveDomain
+    ? enrichmentDomainTableState[enrichmentActiveDomain]
+    : defaultEnrichmentDomainTableState();
+
+  const enrichmentFilteredRows = useMemo(() => {
+    if (!enrichmentActiveTableState.search) return enrichmentActiveRows;
+    const term = enrichmentActiveTableState.search.toLowerCase();
+    return enrichmentActiveRows.filter(
+      (row) =>
+        row.target.toLowerCase().includes(term) ||
+        row.description?.toLowerCase().includes(term)
+    );
+  }, [enrichmentActiveRows, enrichmentActiveTableState.search]);
+
+  const enrichmentSortedRows = useMemo(() => {
+    const { sortConfig } = enrichmentActiveTableState;
+    if (!sortConfig) return enrichmentFilteredRows;
+
+    return [...enrichmentFilteredRows].sort((a, b) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+      const aNum = typeof aVal === "number" ? aVal : parseFloat(String(aVal));
+      const bNum = typeof bVal === "number" ? bVal : parseFloat(String(bVal));
+
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return sortConfig.direction === "asc" ? aNum - bNum : bNum - aNum;
+      }
+      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [enrichmentFilteredRows, enrichmentActiveTableState]);
+
+  const enrichmentTotalPages = Math.max(1, Math.ceil(enrichmentSortedRows.length / ENRICHMENT_PAGE_SIZE));
+  const enrichmentCurrentPage = Math.min(enrichmentActiveTableState.page, enrichmentTotalPages);
+  const enrichmentPaginatedRows = useMemo(() => {
+    const start = (enrichmentCurrentPage - 1) * ENRICHMENT_PAGE_SIZE;
+    return enrichmentSortedRows.slice(start, start + ENRICHMENT_PAGE_SIZE);
+  }, [enrichmentSortedRows, enrichmentCurrentPage]);
+
+  const updateEnrichmentActiveTableState = (patch: Partial<EnrichmentDomainTableState>) => {
+    if (!enrichmentActiveDomain) return;
+    setEnrichmentDomainTableState((prev) => ({
+      ...prev,
+      [enrichmentActiveDomain]: { ...prev[enrichmentActiveDomain], ...patch },
+    }));
+  };
+
+  const handleEnrichmentSort = (key: keyof EnrichmentRow) => {
+    const current = enrichmentActiveTableState.sortConfig;
+    const direction: "asc" | "desc" =
+      current?.key === key && current.direction === "asc" ? "desc" : "asc";
+    updateEnrichmentActiveTableState({ sortConfig: { key, direction }, page: 1 });
+  };
+
+  const enrichmentStartRecord =
+    enrichmentSortedRows.length === 0 ? 0 : (enrichmentCurrentPage - 1) * ENRICHMENT_PAGE_SIZE + 1;
+  const enrichmentEndRecord = Math.min(
+    enrichmentCurrentPage * ENRICHMENT_PAGE_SIZE,
+    enrichmentSortedRows.length
+  );
 
   const handleDownloadCsv = () => {
     if (!analysisResult?.csv_path) return;
@@ -456,7 +801,11 @@ export default function TranscriptomePage() {
 
       const response = await fetch(selectedPath);
       const text = await response.text();
-      const { headers, rows } = parseTsv(text);
+      const { headers: parsedHeaders, rows } = parseTsv(text);
+      const headers =
+        parsedHeaders.length > 0
+          ? [parsedHeaders[0], ...reorderColumnsByTissue(parsedHeaders.slice(1))]
+          : parsedHeaders;
       setTableData({ headers, rows });
 
       if (tableMode === "counts") {
@@ -589,6 +938,40 @@ export default function TranscriptomePage() {
       setSelectedControl(selectedControl.filter((c) => c !== col));
     } else {
       setSelectedComparison(selectedComparison.filter((c) => c !== col));
+    }
+  };
+
+  const availableTissues = useMemo(() => {
+    const seen: string[] = [];
+    columnStatuses.forEach((cs) => {
+      const tissue = getTissueGroup(cs.col);
+      if (!seen.includes(tissue)) seen.push(tissue);
+    });
+    return seen;
+  }, [columnStatuses]);
+
+  const handleQuickSelectTissue = (group: "control" | "comparison", tissue: string) => {
+    const tissueCols = columnStatuses
+      .map((cs) => cs.col)
+      .filter((col) => getTissueGroup(col) === tissue);
+    if (tissueCols.length === 0) return;
+
+    if (group === "control") {
+      const allSelected = tissueCols.every((col) => selectedControl.includes(col));
+      if (allSelected) {
+        setSelectedControl(selectedControl.filter((col) => !tissueCols.includes(col)));
+      } else {
+        setSelectedControl(Array.from(new Set([...selectedControl, ...tissueCols])));
+        setSelectedComparison(selectedComparison.filter((col) => !tissueCols.includes(col)));
+      }
+    } else {
+      const allSelected = tissueCols.every((col) => selectedComparison.includes(col));
+      if (allSelected) {
+        setSelectedComparison(selectedComparison.filter((col) => !tissueCols.includes(col)));
+      } else {
+        setSelectedComparison(Array.from(new Set([...selectedComparison, ...tissueCols])));
+        setSelectedControl(selectedControl.filter((col) => !tissueCols.includes(col)));
+      }
     }
   };
 
@@ -1090,6 +1473,20 @@ export default function TranscriptomePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h4 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">控制組 (Control Group)</h4>
+              {availableTissues.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {availableTissues.map((tissue) => (
+                    <button
+                      type="button"
+                      key={tissue}
+                      onClick={() => handleQuickSelectTissue("control", tissue)}
+                      className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800"
+                    >
+                      {tissue} 全選
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="border border-gray-200 dark:border-gray-600 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
                 <div className="grid grid-cols-2 gap-2">
                   {columnStatuses.map((cs) => (
@@ -1109,6 +1506,20 @@ export default function TranscriptomePage() {
 
             <div>
               <h4 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">對照組 (Comparison Group)</h4>
+              {availableTissues.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {availableTissues.map((tissue) => (
+                    <button
+                      type="button"
+                      key={tissue}
+                      onClick={() => handleQuickSelectTissue("comparison", tissue)}
+                      className="text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800"
+                    >
+                      {tissue} 全選
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="border border-gray-200 dark:border-gray-600 rounded p-4 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700">
                 <div className="grid grid-cols-2 gap-2">
                   {columnStatuses.map((cs) => (
@@ -1179,9 +1590,9 @@ export default function TranscriptomePage() {
                 onChange={(e) => setAnalysisFdr(parseFloat(e.target.value))}
                 className="block w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               >
-                <option value={0.03}>0.03</option>
                 <option value={0.05}>0.05</option>
-                <option value={0.07}>0.07</option>
+                <option value={0.01}>0.01</option>
+                <option value={0.001}>0.001</option>
               </select>
             </div>
             <div>
@@ -1297,11 +1708,24 @@ export default function TranscriptomePage() {
                         PNG
                       </Button>
                     </div>
-                    <div
-                      ref={volcanoPlotRef}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
-                      style={{ minHeight: "450px" }}
-                    />
+                    <div className="flex items-stretch gap-1">
+                      <span
+                        className="flex-shrink-0 whitespace-nowrap self-center text-xs font-mono font-medium text-gray-600 dark:text-gray-400"
+                        style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                      >
+                        -log(FDR)
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          ref={volcanoPlotRef}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                          style={{ minHeight: "450px" }}
+                        />
+                        <div className="mt-1 text-center text-xs font-mono font-medium text-gray-600 dark:text-gray-400">
+                          log2(Fold Change)
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -1318,11 +1742,24 @@ export default function TranscriptomePage() {
                         PNG
                       </Button>
                     </div>
-                    <div
-                      ref={maPlotRef}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
-                      style={{ minHeight: "450px" }}
-                    />
+                    <div className="flex items-stretch gap-1">
+                      <span
+                        className="flex-shrink-0 whitespace-nowrap self-center text-xs font-mono font-medium text-gray-600 dark:text-gray-400"
+                        style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                      >
+                        log2(Fold Change)
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          ref={maPlotRef}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                          style={{ minHeight: "450px" }}
+                        />
+                        <div className="mt-1 text-center text-xs font-mono font-medium text-gray-600 dark:text-gray-400">
+                          log10(Mean Express)
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1350,6 +1787,277 @@ export default function TranscriptomePage() {
                 </div>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {showDiffAnalysis && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+            Enrichment Analysis (Significant DEGs)
+          </h3>
+
+          {!enrichmentSpeciesName ? (
+            <p className="text-gray-600 dark:text-gray-400">
+              此物種尚無 Enrichment 對照資料，暫不支援富集分析。
+            </p>
+          ) : !analysisResult || !csvData ? (
+            <p className="text-gray-600 dark:text-gray-400">
+              請先完成上方差異表達分析，才能使用其顯著基因進行富集分析。
+            </p>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap gap-4 items-end">
+                <div className="flex-shrink-0">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Significant Genes:
+                  </label>
+                  <div className="text-sm text-gray-900 dark:text-white px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-md">
+                    {significantGenes.length} genes (P &lt; {analysisFdr} & |log2FC| &gt; {analysisLogfc})
+                  </div>
+                </div>
+
+                <div className="flex-shrink-0">
+                  <label htmlFor="enrichment-pvalue-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    P-Value (Cut Off):
+                  </label>
+                  <select
+                    id="enrichment-pvalue-select"
+                    className="block w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    value={enrichmentPValue}
+                    onChange={(e) => setEnrichmentPValue(parseFloat(e.target.value) as EnrichmentPValueOption)}
+                  >
+                    <option value={0.05}>0.05</option>
+                    <option value={0.01}>0.01</option>
+                    <option value={0.001}>0.001</option>
+                  </select>
+                </div>
+
+                <div className="flex-shrink-0">
+                  <label htmlFor="enrichment-correction-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Correction Method:
+                  </label>
+                  <select
+                    id="enrichment-correction-select"
+                    className="block w-40 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    value={enrichmentCorrection}
+                    onChange={(e) => setEnrichmentCorrection(e.target.value as EnrichmentCorrectionMethod)}
+                  >
+                    <option value="None">None</option>
+                    <option value="FDR">FDR</option>
+                    <option value="Bonferroni">Bonferroni</option>
+                  </select>
+                </div>
+
+                <div className="flex-shrink-0">
+                  <Button
+                    type="button"
+                    color="blue"
+                    onClick={() => void handleRunEnrichment()}
+                    disabled={enrichmentRunning || significantGenes.length === 0}
+                    isProcessing={enrichmentRunning}
+                    processingSpinner={<Spinner size="sm" />}
+                  >
+                    {enrichmentRunning ? "Running Enrichment..." : "Run Enrichment Analysis"}
+                  </Button>
+                </div>
+              </div>
+
+              {enrichmentError && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded-md">
+                  <strong>錯誤：</strong> {enrichmentError}
+                </div>
+              )}
+
+              {enrichmentResult && !enrichmentError && (
+                enrichmentDomainsWithResults.length === 0 ? (
+                  <p className="text-gray-600 dark:text-gray-400">
+                    沒有符合目前 P-value 門檻與校正方法的結果，請嘗試調整條件。
+                  </p>
+                ) : (
+                  <>
+                    <div className="mb-4 flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700">
+                      {enrichmentDomainsWithResults.map((domain) => (
+                        <button
+                          key={domain}
+                          type="button"
+                          onClick={() => setEnrichmentActiveDomain(domain)}
+                          className={
+                            "px-4 py-2 text-sm font-medium rounded-t-md " +
+                            (enrichmentActiveDomain === domain
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600")
+                          }
+                        >
+                          {ENRICHMENT_DOMAIN_LABELS[domain]}
+                        </button>
+                      ))}
+                    </div>
+
+                    {enrichmentActiveDomain && (
+                      <div>
+                        {enrichmentActiveRows.length > 0 && (
+                          <div className="mb-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <h5 className="text-lg font-medium text-gray-900 dark:text-white">Bubble Plot</h5>
+                                <Button
+                                  type="button"
+                                  size="xs"
+                                  color="light"
+                                  onClick={() =>
+                                    void handleDownloadPlot(
+                                      enrichmentBubblePlotRef,
+                                      `${selectedSpecies.backendSpecies}_${enrichmentActiveDomain}_Bubble`
+                                    )
+                                  }
+                                >
+                                  <HiDownload className="mr-1 h-3 w-3" />
+                                  PNG
+                                </Button>
+                              </div>
+                              <div
+                                ref={enrichmentBubblePlotRef}
+                                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                                style={{ minHeight: "400px" }}
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <h5 className="text-lg font-medium text-gray-900 dark:text-white">Volcano Plot</h5>
+                                <Button
+                                  type="button"
+                                  size="xs"
+                                  color="light"
+                                  onClick={() =>
+                                    void handleDownloadPlot(
+                                      enrichmentVolcanoPlotRef,
+                                      `${selectedSpecies.backendSpecies}_${enrichmentActiveDomain}_Volcano`
+                                    )
+                                  }
+                                >
+                                  <HiDownload className="mr-1 h-3 w-3" />
+                                  PNG
+                                </Button>
+                              </div>
+                              <div className="flex items-stretch gap-1">
+                                <span
+                                  className="flex-shrink-0 whitespace-nowrap self-center text-xs font-mono font-medium text-gray-600 dark:text-gray-400"
+                                  style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                                >
+                                  -log10(p-value)
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    ref={enrichmentVolcanoPlotRef}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg"
+                                    style={{ minHeight: "400px" }}
+                                  />
+                                  <div className="mt-1 text-center text-xs font-mono font-medium text-gray-600 dark:text-gray-400">
+                                    log2(Fold Enrichment)
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mb-4 flex justify-between items-center">
+                          <input
+                            type="text"
+                            placeholder="Search target..."
+                            value={enrichmentActiveTableState.search}
+                            onChange={(e) => updateEnrichmentActiveTableState({ search: e.target.value, page: 1 })}
+                            className="max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          />
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <Table hoverable>
+                            <TableHead>
+                              {(
+                                [
+                                  ["target", "Target ID"],
+                                  ["description", "Description"],
+                                  ["p-value", "P-Value (-log10)"],
+                                  ["observed_ratio", "Observed Ratio"],
+                                  ["expected_ratio", "Expected Ratio"],
+                                  ["fold_enrichment", "Fold Enrichment (log2)"],
+                                  ["count", "Count"],
+                                ] as [keyof EnrichmentRow, string][]
+                              ).map(([key, label]) => (
+                                <TableHeadCell
+                                  key={key}
+                                  onClick={() => handleEnrichmentSort(key)}
+                                  className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span>{label}</span>
+                                    {enrichmentActiveTableState.sortConfig?.key === key &&
+                                      (enrichmentActiveTableState.sortConfig.direction === "asc" ? (
+                                        <HiChevronUp className="w-4 h-4" />
+                                      ) : (
+                                        <HiChevronDown className="w-4 h-4" />
+                                      ))}
+                                  </div>
+                                </TableHeadCell>
+                              ))}
+                            </TableHead>
+                            <TableBody className="divide-y">
+                              {enrichmentPaginatedRows.map((row, index) => (
+                                <TableRow key={`${row.target}-${index}`}>
+                                  <TableCell>{row.target}</TableCell>
+                                  <TableCell>{row.description}</TableCell>
+                                  <TableCell>{row["p-value"]}</TableCell>
+                                  <TableCell>{row.observed_ratio}</TableCell>
+                                  <TableCell>{row.expected_ratio}</TableCell>
+                                  <TableCell>{row.fold_enrichment ?? "-"}</TableCell>
+                                  <TableCell>{row.count}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        <div className="mt-4 flex flex-col items-center justify-between gap-4 sm:flex-row">
+                          <div className="text-sm text-gray-700 dark:text-gray-300">
+                            Showing {enrichmentStartRecord} to {enrichmentEndRecord} of {enrichmentSortedRows.length} entries
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() =>
+                                updateEnrichmentActiveTableState({ page: Math.max(1, enrichmentCurrentPage - 1) })
+                              }
+                              disabled={enrichmentCurrentPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              {enrichmentCurrentPage} / {enrichmentTotalPages}
+                            </span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() =>
+                                updateEnrichmentActiveTableState({
+                                  page: Math.min(enrichmentTotalPages, enrichmentCurrentPage + 1),
+                                })
+                              }
+                              disabled={enrichmentCurrentPage === enrichmentTotalPages}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              )}
+            </>
           )}
         </div>
       )}

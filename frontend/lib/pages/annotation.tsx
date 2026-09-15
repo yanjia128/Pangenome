@@ -13,6 +13,7 @@ import {
   TextInput,
 } from "flowbite-react";
 import { HiSearch } from "react-icons/hi";
+import { useApi } from "../api/use-api";
 
 type SpeciesTableData = {
   headers: string[];
@@ -55,6 +56,15 @@ const SPECIES_OPTIONS: SpeciesOption[] = [
   { file: "Dthyrsiflorum", label: "Dthyrsiflorum" },
 ];
 
+// Mirrors SPECIES_TABLE_MAP in api/views/annotation.py - used only to show
+// the correct gene_annotation_{suffix} table name in the UI.
+function annotationTableSuffix(species: string) {
+  if (species === "DChaoPraya") {
+    return "dchaoprayasmile";
+  }
+  return species.toLowerCase();
+}
+
 function normalize(value: string) {
   return value.trim().toLowerCase();
 }
@@ -67,6 +77,7 @@ function countPopulatedCells(rows: string[][]) {
 }
 
 export default function AnnotationPage() {
+  const { getGeneAnnotation } = useApi();
   const [selectedSpecies, setSelectedSpecies] = useState<string>(SPECIES_OPTIONS[0].file);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -83,22 +94,27 @@ export default function AnnotationPage() {
     setTableData(null);
     setPage(1);
 
-    fetch(`/dendrobium/Data/Annotation/species_tables/${selectedSpecies}.json`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json() as Promise<SpeciesTableData>;
-      })
+    getGeneAnnotation(selectedSpecies)
       .then((data) => {
-        if (!cancelled) {
-          setTableData(data);
+        if (cancelled) {
+          return;
         }
+        if (!data.headers.length) {
+          setError(
+            `無法載入 ${selectedSpecies} 的註解資料。請確認資料庫中已有 gene_annotation_${annotationTableSuffix(
+              selectedSpecies
+            )} 資料表。`
+          );
+          return;
+        }
+        setTableData(data);
       })
       .catch((fetchError) => {
         if (!cancelled) {
           setError(
-            `無法載入 ${selectedSpecies}.json。請確認 species_tables 資料已存在於 frontend/public/Data/Annotation/species_tables。`
+            `無法載入 ${selectedSpecies} 的註解資料。請確認資料庫中已有 gene_annotation_${annotationTableSuffix(
+              selectedSpecies
+            )} 資料表。`
           );
           console.error(fetchError);
         }
@@ -167,10 +183,12 @@ export default function AnnotationPage() {
               <p className="max-w-2xl text-sm leading-6 text-gray-700">
                 Explore gene-level annotation tables for each orchid species in a more
                 expressive, specimen-catalog style view. The table below reads directly from
+                the{" "}
                 <code className="mx-1 rounded bg-white/80 px-1.5 py-0.5 text-xs text-rose-700">
-                  species_tables
+                  gene_annotation_{"{species}"}
                 </code>
-                and is tuned for quick browsing of COG, GO, KEGG, Pfam, and EC metadata.
+                tables in the dendrobium database, and is tuned for quick browsing of COG, GO,
+                KEGG, Pfam, and EC metadata.
               </p>
             </div>
           </div>
@@ -213,7 +231,9 @@ export default function AnnotationPage() {
 
           <div className="mt-4 rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,_#f7fff7_0%,_#fffdfa_100%)] p-4 text-sm text-gray-700">
             <div className="font-semibold text-gray-900">Current specimen table</div>
-            <div className="mt-1 font-mono text-xs text-emerald-700">{selectedSpecies}.json</div>
+            <div className="mt-1 font-mono text-xs text-emerald-700">
+              gene_annotation_{annotationTableSuffix(selectedSpecies)}
+            </div>
             {tableData && (
               <div className="mt-4 grid gap-2 text-xs">
                 <div className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2">

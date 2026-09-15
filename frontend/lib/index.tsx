@@ -7,7 +7,6 @@ import { FullScreenLoading } from "./components/full-screen-loading";
 import { Topbar } from "./components/topbar";
 import "./index.css";
 
-const LandingPage = lazy(() => import("./pages/landing"));
 const HomePage = lazy(() => import("./pages/home"));
 const BlogPage = lazy(() => import("./pages/blog"));
 const PublicationPage = lazy(() => import("./pages/publication"));
@@ -15,6 +14,7 @@ const OrthogroupsPage = lazy(() => import("./pages/orthogroups"));
 const PhyloxoniumPage = lazy(() => import("./pages/phyloxonnium"));
 const PhylocanvasPage = lazy(() => import("./pages/phylocanvas"));
 const TranscriptomePage = lazy(() => import("./pages/transcriptome"));
+const EnrichmentPage = lazy(() => import("./pages/enrichment"));
 const JBrowsePage = lazy(() => import("./pages/jbrowse"));
 const AnalysisPage = lazy(() => import("./pages/analsis"));
 const AnnotationPage = lazy(() => import("./pages/annotation"));
@@ -35,13 +35,7 @@ export function Root() {
       <Routes>
         <Route
           path={ROUTES.LANDING_PAGE}
-          element={
-            <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-              <Suspense fallback={<FullScreenLoading />}>
-                <LandingPage />
-              </Suspense>
-            </div>
-          }
+          element={<Navigate to={ROUTES.HOME} replace />}
         />
         <Route
           path={ROUTES.HOME}
@@ -129,6 +123,16 @@ export function Root() {
             <div className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">
               <Suspense fallback={<FullScreenLoading />}>
                 <TranscriptomePage />
+              </Suspense>
+            </div>
+          }
+        />
+        <Route
+          path={ROUTES.ENRICHMENT}
+          element={
+            <div className="mx-auto max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">
+              <Suspense fallback={<FullScreenLoading />}>
+                <EnrichmentPage />
               </Suspense>
             </div>
           }

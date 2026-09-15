@@ -1,5 +1,6 @@
 import os
 import re
+from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,6 +10,12 @@ GENE_TREES_DIR = "/home/user/Orchid/Pangenome/rst/Results_Nov26/Gene_Trees"
 
 # Only allow filenames like OG0000000_tree.txt
 VALID_FILENAME_RE = re.compile(r"^OG\d+_tree\.txt$")
+
+GENE_TREE_FILENAMES_CACHE_KEY = "gene_tree_filenames"
+
+
+def _list_gene_tree_filenames():
+    return sorted(f for f in os.listdir(GENE_TREES_DIR) if f.endswith("_tree.txt"))
 
 
 class GeneTreeListEndpoint(APIView):
@@ -21,8 +28,8 @@ class GeneTreeListEndpoint(APIView):
         search = request.GET.get("search", "").strip()
 
         try:
-            all_files = sorted(
-                f for f in os.listdir(GENE_TREES_DIR) if f.endswith("_tree.txt")
+            all_files = cache.get_or_set(
+                GENE_TREE_FILENAMES_CACHE_KEY, _list_gene_tree_filenames, timeout=None
             )
         except FileNotFoundError:
             return Response(
@@ -72,8 +79,11 @@ class GeneTreeDetailEndpoint(APIView):
                 {"error": "Tree not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        with open(filepath, "r") as f:
-            newick = f.read().strip()
+        def _read_newick():
+            with open(filepath, "r") as f:
+                return f.read().strip()
+
+        newick = cache.get_or_set(f"gene_tree_{tree_id}", _read_newick, timeout=None)
 
         return Response(
             {
