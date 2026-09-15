@@ -11,7 +11,6 @@ const HomePage = lazy(() => import("./pages/home"));
 const BlogPage = lazy(() => import("./pages/blog"));
 const PublicationPage = lazy(() => import("./pages/publication"));
 const OrthogroupsPage = lazy(() => import("./pages/orthogroups"));
-const PhyloxoniumPage = lazy(() => import("./pages/phyloxonnium"));
 const PhylocanvasPage = lazy(() => import("./pages/phylocanvas"));
 const TranscriptomePage = lazy(() => import("./pages/transcriptome"));
 const EnrichmentPage = lazy(() => import("./pages/enrichment"));
