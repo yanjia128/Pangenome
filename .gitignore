@@ -36,3 +36,21 @@ coverage
 
 # Ruff
 .ruff_cache
+
+#file
+*.tsv
+*.png
+*.csv
+
+#frontend/data
+frontend/public/Data
+
+#logs/
+logs/
+.dev.pid
+
+# docs/
+docs/
+
+#disabled yml
+.disabled

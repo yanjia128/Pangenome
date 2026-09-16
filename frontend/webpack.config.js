@@ -6,10 +6,16 @@ const CopyWebpackPlugin = require("copy-webpack-plugin");
 const Dotenv = require("dotenv-webpack");
 
 const PUBLIC_PATH = "/static/frontend/";
+const DEV_PREFIX = "/dendrobium";
+const JBROWSE_PREFIX = `${DEV_PREFIX}/SyntneyViewer`;
+const BACKEND_URL = "http://localhost:8866";
 
 const PORT = 4000;
 
 const PRODUCTION_MODE = process.env.NODE_ENV === "production";
+const copyPatterns = PRODUCTION_MODE
+  ? [{ from: "public" }]
+  : [{ from: "public", ignore: ["**/Data/**"] }];
 
 if (!PRODUCTION_MODE) {
   console.log(
@@ -24,7 +30,7 @@ module.exports = {
   output: {
     filename: "index.js",
     path: path.resolve(__dirname, PUBLIC_PATH.replace("/", "")),
-    publicPath: PRODUCTION_MODE ? PUBLIC_PATH : "/",
+    publicPath: PRODUCTION_MODE ? PUBLIC_PATH : "auto",
   },
   devtool: "source-map",
   resolve: {
@@ -49,8 +55,9 @@ module.exports = {
         "index.html"
       ),
       filename: "index.html",
+      inject: PRODUCTION_MODE,
     }),
-    new CopyWebpackPlugin([{ from: "public" }]),
+    new CopyWebpackPlugin(copyPatterns),
     new webpack.HotModuleReplacementPlugin(),
     new webpack.optimize.AggressiveMergingPlugin(),
     new Dotenv(),
@@ -91,12 +98,60 @@ module.exports = {
     ],
   },
   devServer: {
-    watchFiles: `.${PUBLIC_PATH}`,
+    //watchFiles: `.${PUBLIC_PATH}`,
     compress: true,
     port: PORT,
     hot: true,
     open: true,
-    historyApiFallback: true,
-    allowedHosts: ["127.0.0.0", "localhost"],
+    historyApiFallback: {
+      rewrites: [
+        { from: /^\/dendrobium(?:\/.*)?$/, to: "/index.html" },
+        { from: /./, to: "/index.html" },
+      ],
+    },
+    allowedHosts: "all",
+    setupMiddlewares: (middlewares, devServer) => {
+      if (!devServer) {
+        return middlewares;
+      }
+
+      devServer.app.use((req, _res, next) => {
+        if (!req.url) {
+          next();
+          return;
+        }
+
+        if (
+          req.url === `${DEV_PREFIX}/Data` ||
+          req.url.startsWith(`${DEV_PREFIX}/Data/`) ||
+          req.url === JBROWSE_PREFIX ||
+          req.url.startsWith(`${JBROWSE_PREFIX}/`)
+        ) {
+          next();
+          return;
+        }
+
+        if (req.url.startsWith(`${DEV_PREFIX}/`)) {
+          req.url = req.url.slice(DEV_PREFIX.length) || "/";
+        }
+        next();
+      });
+
+      return middlewares;
+    },
+    static: [
+      {
+        directory: path.join(__dirname, "public", "Data"),
+        publicPath: `${DEV_PREFIX}/Data`,
+        watch: false, // 提供即時 Data 檔案，避免 in-memory stale assets
+      },
+    ],
+    proxy: [
+      {
+        context: [JBROWSE_PREFIX],
+        target: BACKEND_URL,
+        changeOrigin: true,
+      },
+    ],
   },
 };

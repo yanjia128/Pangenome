@@ -12,8 +12,8 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "module": "esnext",
-    "lib": ["es6", "dom", "dom.iterable"]
+    "lib": ["es2019", "dom", "dom.iterable"]
   },
-  "include": ["./lib/**/*", "./index.tsx", "./declarations.d.ts"],
-  "exclude": ["node_modules", "static/frontend", "**/__tests__/**/*"]
+  "include": ["./lib/**/*", "./index.tsx", "./declarations.d.ts", "./jsx-global.d.ts"],
+  "exclude": ["node_modules", "static/frontend", "**/__tests__/**/*", "public"]
 }

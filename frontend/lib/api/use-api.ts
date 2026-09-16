@@ -5,15 +5,18 @@ import {
   getFilteredPublicationsEndoint,
   getPaginatedFilteredPublicationsEndoint,
   getOrthogroupsEndpoint,
+  getOrthogroupFastaDownloadEndpoint,
+  getAnnotationEndpoint,
   getGeneTreesEndpoint,
   getGeneTreeDetailEndpoint,
+  getDifferentialExpressionEndpoint,
+  getEnrichmentAnalysisEndpoint,
+  getEnrichmentExampleGenesEndpoint,
 } from "./utils";
 import { getSecrets } from "../config";
 import type { GetPaginatedPublicationsResponse, Publication } from "./types";
 
-const { isProd, authToken } = getSecrets();
-
-const LOCAL_API_URL = "http://localhost:8866";
+const { isProd, authToken, apiBaseUrl } = getSecrets();
 
 export function useApi() {
   const getHeaders = new Headers({
@@ -32,9 +35,9 @@ export function useApi() {
           title: args.title ?? "",
           tag: args.tag ?? [],
         });
-        return isProd ? filtered : LOCAL_API_URL + filtered;
+        return isProd ? filtered : apiBaseUrl + filtered;
       }
-      return isProd ? getPublicationsEndpoint : LOCAL_API_URL + getPublicationsEndpoint;
+      return isProd ? getPublicationsEndpoint : apiBaseUrl + getPublicationsEndpoint;
     })();
 
     return fetch(endpoint, {
@@ -63,7 +66,7 @@ export function useApi() {
           return getPaginatedPublicationsEndpoint;
         }
 
-        return LOCAL_API_URL + getPaginatedPublicationsEndpoint;
+        return apiBaseUrl + getPaginatedPublicationsEndpoint;
       }
 
       if (args.querystring) {
@@ -76,7 +79,7 @@ export function useApi() {
         }
 
         return (
-          LOCAL_API_URL +
+          apiBaseUrl +
           getPaginatedPublicationsEndpoint +
           `?page=${args.page}`
         );
@@ -89,7 +92,7 @@ export function useApi() {
         }
 
         return (
-          LOCAL_API_URL +
+          apiBaseUrl +
           getPaginatedFilteredPublicationsEndoint({
             title: args.filter.title,
             tag: args.filter.tags,
@@ -114,7 +117,7 @@ export function useApi() {
     return fetch(
       isProd
         ? getPublicationEndpoint(slug)
-        : LOCAL_API_URL + getPublicationEndpoint(slug),
+        : apiBaseUrl + getPublicationEndpoint(slug),
       {
         cache: "default",
         method: "GET",
@@ -141,7 +144,7 @@ export function useApi() {
     const query = params.toString() ? `?${params.toString()}` : "";
     const endpoint = isProd
       ? getOrthogroupsEndpoint + query
-      : LOCAL_API_URL + getOrthogroupsEndpoint + query;
+      : apiBaseUrl + getOrthogroupsEndpoint + query;
 
     return fetch(endpoint, {
       cache: "default",
@@ -152,6 +155,58 @@ export function useApi() {
       .catch((error) => {
         console.error(error);
         return { count: 0, num_pages: 0, results: [] as Record<string, unknown>[] };
+      });
+  }
+
+  async function downloadOrthogroupFasta(orthogroupId: string): Promise<Blob> {
+    const path = getOrthogroupFastaDownloadEndpoint(orthogroupId);
+    const endpoint = isProd ? path : apiBaseUrl + path;
+
+    const response = await fetch(endpoint, {
+      cache: "no-cache",
+      method: "GET",
+      headers: getHeaders,
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}`;
+
+      try {
+        const errorData = await response.json();
+        if (typeof errorData?.error === "string" && errorData.error.length > 0) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // Ignore JSON parsing errors and keep the HTTP-based message.
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    return response.blob();
+  }
+
+  async function getGeneAnnotation(
+    species: string
+  ): Promise<{ headers: string[]; rows: string[][] }> {
+    const params = new URLSearchParams({ species });
+    const query = `?${params.toString()}`;
+    const endpoint = isProd
+      ? getAnnotationEndpoint + query
+      : apiBaseUrl + getAnnotationEndpoint + query;
+
+    return fetch(endpoint, {
+      cache: "default",
+      method: "GET",
+      headers: getHeaders,
+    })
+      .then((response): Promise<{ headers: string[]; rows: string[][] }> => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .catch((error) => {
+        console.error(error);
+        return { headers: [] as string[], rows: [] as string[][] };
       });
   }
 
@@ -168,7 +223,7 @@ export function useApi() {
     const query = params.toString() ? `?${params.toString()}` : "";
     const endpoint = isProd
       ? getGeneTreesEndpoint + query
-      : LOCAL_API_URL + getGeneTreesEndpoint + query;
+      : apiBaseUrl + getGeneTreesEndpoint + query;
 
     return fetch(endpoint, {
       cache: "default",
@@ -184,7 +239,7 @@ export function useApi() {
 
   async function getGeneTree(treeId: string): Promise<{ id: string; newick: string } | null> {
     const path = getGeneTreeDetailEndpoint(treeId);
-    const endpoint = isProd ? path : LOCAL_API_URL + path;
+    const endpoint = isProd ? path : apiBaseUrl + path;
 
     return fetch(endpoint, {
       cache: "default",
@@ -201,12 +256,121 @@ export function useApi() {
       });
   }
 
+  async function submitDifferentialExpression(payload: {
+    species: string;
+    method: "edgeR" | "DESeq2";
+    control_samples: string[];
+    comparison_samples: string[];
+    all_columns_map: { col: string; stat: "control" | "comparison" | "unselected" }[];
+    size: string;
+    fdr: number;
+    logfc: number;
+  }): Promise<{
+    status?: string;
+    volcano_path?: string;
+    ma_path?: string;
+    csv_path?: string;
+    jobID?: string;
+    cached?: boolean;
+    method?: string;
+    error?: string;
+  } | null> {
+    const mappedMethod = payload.method === "DESeq2" ? "DESeq2" : "edgeR";
+    const endpoint = isProd
+      ? getDifferentialExpressionEndpoint
+      : apiBaseUrl + getDifferentialExpressionEndpoint;
+
+    return fetch(endpoint, {
+      cache: "no-cache",
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(getHeaders.entries()),
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        ...payload,
+        method: mappedMethod,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          return { error: data?.error ?? `HTTP ${response.status}` };
+        }
+        return data;
+      })
+      .catch((error) => {
+        console.error(error);
+        return { error: "Differential expression request failed." };
+      });
+  }
+
+  async function submitEnrichmentAnalysis(payload: {
+    species: string;
+    input: string;
+    p_value: number;
+    correctionMethod: "None" | "FDR" | "Bonferroni";
+  }): Promise<Record<string, unknown>> {
+    const endpoint = isProd
+      ? getEnrichmentAnalysisEndpoint
+      : apiBaseUrl + getEnrichmentAnalysisEndpoint;
+
+    return fetch(endpoint, {
+      cache: "no-cache",
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(getHeaders.entries()),
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(payload),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          return { error: data?.error ?? `HTTP ${response.status}` };
+        }
+        return data;
+      })
+      .catch((error) => {
+        console.error(error);
+        return { error: "Enrichment analysis request failed." };
+      });
+  }
+
+  async function getEnrichmentExampleGenes(
+    species: string
+  ): Promise<{ geneList: string[]; error?: string }> {
+    const endpoint = isProd
+      ? getEnrichmentExampleGenesEndpoint
+      : apiBaseUrl + getEnrichmentExampleGenesEndpoint;
+
+    return fetch(endpoint, {
+      cache: "no-cache",
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(getHeaders.entries()),
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({ species }),
+    })
+      .then((response) => response.json() as Promise<{ geneList: string[]; error?: string }>)
+      .catch((error) => {
+        console.error(error);
+        return { geneList: [] as string[], error: "Failed to fetch example genes." };
+      });
+  }
+
   return {
     getPublications,
     getPaginatedPublications,
     getPublication,
     getOrthogroups,
+    downloadOrthogroupFasta,
+    getGeneAnnotation,
     getGeneTreeList,
     getGeneTree,
+    submitDifferentialExpression,
+    submitEnrichmentAnalysis,
+    getEnrichmentExampleGenes,
   };
 }

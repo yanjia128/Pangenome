@@ -1,0 +1,2832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dendrobium Pangenome</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="data.js"></script>
+  <script src="ks_data.js"></script>
+  <script src="eggnog_data.js"></script>
+  <style>
+    /* ── NPG / Nature-Science colour palette ── */
+    :root {
+      /* Brand (Nature Publishing Group inspired) */
+      --npg-navy:    #3C5488;
+      --npg-red:     #E64B35;
+      --npg-teal:    #00A087;
+      --npg-cyan:    #4DBBD5;
+      --npg-purple:  #8491B4;
+      --npg-salmon:  #F39B7F;
+      /* UI */
+      --bg:          #FFFFFF;
+      --bg-alt:      #F7F7F7;
+      --card-bg:     #FFFFFF;
+      --border:      #D9D9D9;
+      --border-light:#EBEBEB;
+      --text:        #1A1A1A;
+      --text-muted:  #6B6B6B;
+      --text-light:  #999999;
+      /* Pangenome categories */
+      --color-core:        #00A087;
+      --color-softcore:    #3C5488;
+      --color-dispensable: #F39B7F;
+      --color-private:     #E64B35;
+    }
+
+    /* ── Base ── */
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      font-family: 'Source Sans 3', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    /* ── Navbar ── */
+    .top-navbar {
+      background: #1D1D1B;
+      padding: 0 2rem;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      height: 68px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      border-bottom: 3px solid var(--npg-red);
+    }
+    .top-navbar .brand {
+      color: #FFFFFF;
+      font-size: 1.05rem;
+      font-weight: 700;
+      font-family: 'Merriweather', Georgia, serif;
+      white-space: nowrap;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      padding-right: 2rem;
+      margin-right: 1rem;
+      border-right: 1px solid rgba(255,255,255,.15);
+      letter-spacing: .01em;
+    }
+    .top-navbar .brand span {
+      font-weight: 400;
+      color: rgba(255,255,255,.5);
+      font-size: .85rem;
+      margin-left: 10px;
+      font-family: 'Source Sans 3', sans-serif;
+    }
+    .top-navbar .nav-pills {
+      flex: 1; display: flex; gap: 0; margin: 0; padding: 0; list-style: none; align-items: stretch;
+    }
+    .top-navbar .nav-pills li { display: flex; }
+    .top-navbar .nav-pills a {
+      color: rgba(255,255,255,.6);
+      text-decoration: none;
+      padding: 0 28px;
+      font-size: 1rem;
+      font-family: 'Source Sans 3', 'Helvetica Neue', Arial, sans-serif;
+      letter-spacing: .01em;
+      display: flex; align-items: center;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -3px;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .top-navbar .nav-pills a:hover { color: rgba(255,255,255,.95); border-bottom-color: rgba(255,255,255,.3); }
+    .top-navbar .nav-pills a.active {
+      color: #FFFFFF;
+      font-weight: 600;
+      border-bottom-color: var(--npg-red);
+    }
+    .top-navbar .badge-version {
+      color: rgba(255,255,255,.35);
+      font-size: .78rem;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      display: flex; align-items: center;
+      padding-left: 1.5rem;
+      border-left: 1px solid rgba(255,255,255,.12);
+      margin-left: auto;
+    }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Shared containers ── */
+    .pg-container,
+    .fig-container { max-width: 1440px; margin: auto; padding: 1.5rem 2rem; }
+
+    /* ── Section titles ── */
+    .section-title {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+      border-left: 3px solid var(--npg-red);
+      padding-left: .6rem;
+      margin: 2rem 0 1rem;
+      letter-spacing: 0;
+    }
+    .fig-section { margin-bottom: 2.5rem; }
+    .fig-section h4 {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--text);
+      border-left: 3px solid var(--npg-red);
+      padding-left: .6rem;
+      margin-bottom: .9rem;
+    }
+
+    /* ── Stat cards ── */
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+    }
+    .stat-value { font-size: 1.75rem; font-weight: 700; font-family: 'Merriweather', Georgia, serif; }
+    .stat-label {
+      font-size: .75rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em;
+      font-family: 'Source Sans 3', sans-serif;
+    }
+
+    /* ── Chart cards ── */
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      margin-bottom: 1.25rem;
+    }
+    .chart-card .card-header {
+      background: var(--bg-alt);
+      border-bottom: 1px solid var(--border);
+      font-size: .88rem;
+      font-weight: 600;
+      font-style: italic;
+      color: #333333;
+      padding: .6rem 1rem;
+      letter-spacing: 0;
+    }
+
+    /* ── Figure cards ── */
+    .fig-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .fig-card .fig-title {
+      font-size: .82rem; font-weight: 700; color: #333;
+      font-style: italic;
+      padding: .5rem 1rem; background: var(--bg-alt);
+      border-bottom: 1px solid var(--border);
+    }
+    .fig-card .fig-desc {
+      font-size: .79rem; color: var(--text-muted); line-height: 1.7;
+      padding: .5rem 1rem .7rem;
+      border-bottom: 1px solid var(--border-light);
+      background: #FAFAFA;
+    }
+    .fig-card img { width: 100%; display: block; cursor: zoom-in; }
+    .fig-card img:hover { opacity: .93; }
+    .fig-card .card-body { padding: .5rem; }
+
+    /* ── Description boxes (figure captions) ── */
+    .fig-desc {
+      font-size: .85rem;
+      font-style: italic;
+      color: var(--text-muted);
+      line-height: 1.7;
+      background: #FAFAFA;
+      border-left: 2px solid var(--border);
+      padding: .5rem .9rem;
+      margin-bottom: .75rem;
+    }
+    .fig-desc b { color: var(--text); font-style: normal; }
+
+    /* ── Annotation table ── */
+    #sp-table-wrap { overflow-x: auto; }
+    #sp-table {
+      width: 100%; border-collapse: collapse;
+      font-size: .85rem;
+      font-family: 'Source Sans 3', 'Helvetica Neue', sans-serif;
+    }
+    #sp-table th {
+      background: #1D1D1B; color: #D0D0D0;
+      font-weight: 600; font-size: .75rem; text-transform: uppercase;
+      letter-spacing: .06em; padding: 8px 12px;
+      border-right: 1px solid #333; cursor: pointer;
+      white-space: nowrap; user-select: none;
+    }
+    #sp-table th:hover { background: #2E2E2C; }
+    #sp-table th .sort-icon { opacity: .35; margin-left: 4px; font-size: .62rem; }
+    #sp-table th.sort-asc .sort-icon::after { content: '▲'; opacity: 1; }
+    #sp-table th.sort-desc .sort-icon::after { content: '▼'; opacity: 1; }
+    #sp-table td {
+      padding: 6px 12px; border-bottom: 1px solid var(--border-light);
+      vertical-align: top; max-width: 260px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #sp-table tr:hover td { background: #F5F5F5; }
+    #sp-table .cog-badge {
+      display: inline-block; background: var(--npg-navy); color: white;
+      font-size: .67rem; padding: 1px 5px; border-radius: 2px;
+      font-weight: 700; letter-spacing: .04em;
+    }
+    #sp-table .gene-id { font-family: 'Courier New', monospace; font-size: .74rem; color: #333; }
+    .go-badge {
+      display: inline-block; background: #e8f4f8; color: #1a5f7a;
+      font-size: .65rem; padding: 1px 5px; border-radius: 3px;
+      text-decoration: none; font-family: monospace; margin: 1px;
+      border: 1px solid #b8dce8;
+    }
+    .go-badge:hover { background: #4DBBD5; color: white; border-color: #4DBBD5; }
+    .table-pagination { display: flex; align-items: center; gap: 8px; font-size: .79rem; color: var(--text-muted); }
+    .table-pagination button {
+      padding: 3px 10px; border: 1px solid var(--border); border-radius: 2px;
+      background: white; cursor: pointer; font-size: .78rem; color: var(--text);
+    }
+    .table-pagination button:hover:not(:disabled) { background: var(--npg-navy); color: white; border-color: var(--npg-navy); }
+    .table-pagination button:disabled { opacity: .35; cursor: default; }
+    .table-pagination .page-info { min-width: 120px; text-align: center; }
+    #table-search {
+      border: 1px solid var(--border); border-radius: 2px;
+      padding: 4px 10px; font-size: .8rem; width: 220px; outline: none;
+    }
+    #table-search:focus { border-color: var(--npg-navy); outline: 2px solid rgba(60,84,136,.2); }
+    #cog-filter {
+      border: 1px solid var(--border); border-radius: 2px;
+      padding: 4px 8px; font-size: .78rem;
+    }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.9);
+      z-index: 9999; align-items: center; justify-content: center; cursor: zoom-out;
+    }
+    #lightbox.open { display: flex; }
+    #lightbox img { max-width: 92vw; max-height: 92vh; }
+    #lightbox-close {
+      position: absolute; top: 16px; right: 22px; color: white;
+      font-size: 2rem; cursor: pointer; line-height: 1; opacity: .6;
+    }
+    #lightbox-close:hover { opacity: 1; }
+
+    /* ── Genome browser tab ── */
+    .browser-wrap { display: flex; flex-direction: column; height: calc(100vh - 68px); }
+    .browser-toolbar {
+      background: var(--bg-alt); padding: .4rem 1rem;
+      border-bottom: 1px solid var(--border); display: flex; gap: .75rem; align-items: center;
+      font-size: .79rem; color: var(--text-muted); flex-shrink: 0;
+    }
+    .browser-toolbar .url-badge {
+      background: white; color: #333;
+      padding: 2px 8px; border-radius: 2px; font-family: 'Courier New', monospace; font-size: .74rem;
+      border: 1px solid var(--border);
+    }
+    .browser-toolbar .info { margin-left: auto; color: var(--text-light); font-size: .74rem; }
+    #jbrowse-frame { flex: 1; border: none; width: 100%; background: #fff; }
+    #seqserver-frame { flex: 1; border: none; width: 100%; background: #fff; }
+
+    /* ── RNA-seq Analysis tab ── */
+    .rnaseq-layout { display: flex; height: calc(100vh - 68px); gap: 0; }
+    .rnaseq-sidebar { width: 280px; flex-shrink:0; background:var(--bg-alt); border-right:1px solid var(--border); padding:1rem; overflow-y:auto; }
+    .rnaseq-main { flex:1; padding:1rem; overflow-y:auto; }
+    .rnaseq-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); margin:1rem 0 .5rem; }
+    .rnaseq-group-checks { display:flex; flex-wrap:wrap; gap:.3rem; margin-bottom:.5rem; }
+    .rnaseq-group-checks label { font-size:.8rem; display:flex; align-items:center; gap:.25rem; cursor:pointer; }
+    .run-btn { width:100%; padding:.45rem; border:none; border-radius:4px; cursor:pointer; font-size:.84rem; font-weight:600; margin-top:.4rem; }
+    .run-btn-pca { background:#E8EEF7; color:var(--npg-navy); }
+    .run-btn-pca:hover { background:#d0ddef; }
+    .run-btn-de { background:var(--npg-navy); color:white; }
+    .run-btn-de:hover { background:#2a3d6e; }
+    .rnaseq-status { font-size:.78rem; margin-top:.6rem; padding:.4rem .6rem; border-radius:4px; display:none; }
+    .rnaseq-status.running { display:block; background:#fff3cd; color:#856404; }
+    .rnaseq-status.done { display:block; background:#d1e7dd; color:#0a3622; }
+    .rnaseq-status.error { display:block; background:#f8d7da; color:#842029; }
+    .deg-badge { padding:1px 6px; border-radius:3px; font-size:.72rem; font-weight:600; }
+    .badge-up { background:#fde8e8; color:#c0392b; }
+    .badge-down { background:#e8f0fe; color:#1a56db; }
+    .rnaseq-stats { display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap; }
+    .rnaseq-stat-card { background:white; border:1px solid var(--border); border-radius:6px; padding:.5rem 1rem; font-size:.82rem; }
+    .rnaseq-stat-card strong { display:block; font-size:1.3rem; }
+    .rnaseq-form-label { font-size:.78rem; font-weight:600; color:var(--text); display:block; margin-bottom:.2rem; }
+    .rnaseq-select { width:100%; padding:.3rem .5rem; font-size:.82rem; border:1px solid var(--border); border-radius:4px; background:white; margin-bottom:.5rem; }
+    .rnaseq-number { width:100%; padding:.3rem .5rem; font-size:.82rem; border:1px solid var(--border); border-radius:4px; margin-bottom:.5rem; }
+    .rnaseq-divider { border:none; border-top:1px solid var(--border); margin:1rem 0; }
+    .rnaseq-placeholder { display:flex; align-items:center; justify-content:center; min-height:300px; color:var(--text-muted); font-size:.9rem; flex-direction:column; gap:.5rem; }
+    .rnaseq-inner-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1rem; }
+    .rnaseq-inner-tab { padding:.4rem 1rem; font-size:.82rem; cursor:pointer; border:none; background:none; color:var(--text-muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+    .rnaseq-inner-tab.active { color:var(--npg-navy); font-weight:600; border-bottom-color:var(--npg-navy); }
+    .rnaseq-inner-panel { display:none; }
+    .rnaseq-inner-panel.active { display:block; }
+    #deg-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    #deg-table th { background:#1D1D1B; color:#D0D0D0; font-weight:600; font-size:.74rem; text-transform:uppercase; letter-spacing:.05em; padding:7px 10px; cursor:pointer; white-space:nowrap; }
+    #deg-table td { padding:5px 10px; border-bottom:1px solid var(--border-light); white-space:nowrap; }
+    #deg-table tr:hover td { background:#f5f5f5; }
+
+    /* ── Footer ── */
+    footer {
+      background: #1D1D1B;
+      border-top: 1px solid #333;
+      color: rgba(255,255,255,.3);
+      font-size: .72rem; text-align: center; padding: .8rem;
+      margin-top: 2.5rem; letter-spacing: .04em;
+      font-family: 'Source Sans 3', sans-serif;
+    }
+
+    .fw-600 { font-weight: 600; }
+    .plotly-chart { min-height: 360px; }
+
+    @media (max-width: 767px) {
+      .stat-value { font-size: 1.4rem; }
+      .top-navbar .badge-version { display: none; }
+      .pg-container, .fig-container { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top Navbar ─────────────────────────────────────────────────────────── -->
+<nav class="top-navbar">
+  <a href="/dendrobium/home" class="brand">
+    Dendrobium Pangenome
+  </a>
+  <ul class="nav-pills">
+    <li><a href="#" id="tab-btn-pangenome"  class="active"  onclick="showTab('pangenome')">Pangenome</a></li>
+    <li><a href="#" id="tab-btn-figures"    onclick="showTab('figures')">Analysis Figures</a></li>
+    <li><a href="#" id="tab-btn-browser"    onclick="showTab('browser')">Genome Browser</a></li>
+    <li><a href="#" id="tab-btn-annotation" onclick="showTab('annotation')">Functional Annotation</a></li>
+    <li><a href="#" id="tab-btn-blast"      onclick="showTab('blast')" style="font-weight:700;letter-spacing:.04em;">BLAST</a></li>
+    <li><a href="#" id="tab-btn-seqserver"  onclick="showTab('seqserver')">SequenceServer</a></li>
+    <li><a href="#" id="tab-btn-rnaseq"     onclick="showTab('rnaseq')">RNA-seq Tools</a></li>
+    <li><a href="#" id="tab-btn-vigs"       onclick="showTab('vigs')">VIGS 設計</a></li>
+    <li><a href="#" id="tab-btn-vigs-orig"  onclick="showTab('vigs-orig')">VIGS 原版</a></li>
+    <li><a href="#" id="tab-btn-methods"    onclick="showTab('methods')">Methods</a></li>
+  </ul>
+  <span class="badge-version">26 species · Mar 2026</span>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 1 — PANGENOME DASHBOARD
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-pangenome" class="tab-panel active">
+<div class="pg-container">
+
+  <div class="section-title">Overview</div>
+  <div class="row g-3 mb-2 justify-content-center" id="stat-cards"></div>
+
+  <div class="section-title">Gene Classification</div>
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card chart-card h-100">
+        <div class="card-header">Distribution by Category</div>
+        <div class="card-body"><div id="chart-donut" class="plotly-chart"></div></div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card chart-card h-100">
+        <div class="card-header">Pangenome &amp; Core Genome Size vs. Number of Species (100 random permutations)</div>
+        <div class="card-body"><div id="chart-accum" style="min-height:380px;"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Per-Species Statistics</div>
+  <div class="card chart-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Gene Counts by Species</span>
+      <select class="form-select form-select-sm w-auto" id="sp-metric">
+        <option value="n_genes">Total genes</option>
+        <option value="n_in_orthogroups">Genes in orthogroups</option>
+        <option value="n_unassigned">Unassigned genes</option>
+        <option value="n_orthogroups">Orthogroups present</option>
+        <option value="n_species_specific">Species-specific OGs</option>
+      </select>
+    </div>
+    <div class="card-body">
+      <div id="chart-species-bar" style="min-height:420px;"></div>
+      <div id="sp-metric-desc" style="font-size:.78rem;color:#5a6a85;margin-top:6px;padding:6px 4px;border-top:1px solid var(--border);"></div>
+    </div>
+  </div>
+
+  <div class="section-title">Species Orthogroup Overlap</div>
+  <div class="card chart-card">
+    <div class="card-header">Number of shared orthogroups between species pairs</div>
+    <div class="card-body"><div id="chart-heatmap" style="min-height:580px;"></div></div>
+  </div>
+
+  <div class="section-title">PCA — Gene Presence/Absence</div>
+  <div class="card chart-card">
+    <div class="card-header">Principal Component Analysis of Orthogroup Presence/Absence Profiles</div>
+    <div class="card-body"><div id="chart-pca" style="min-height:480px;"></div></div>
+  </div>
+
+  <div class="section-title">Gene Duplication Events</div>
+  <div class="card chart-card">
+    <div class="card-header">Duplications per Species (OrthoFinder gene tree inference)</div>
+    <div class="card-body">
+      <div id="chart-dup" style="min-height:480px;"></div>
+      <div class="fig-desc">Data source: <code>OrthoFinder/Comparative_Genomics_Statistics/Duplications_per_Species_Tree_Node.tsv</code></div>
+    </div>
+  </div>
+
+</div><!-- /pg-container -->
+<footer>Dendrobium Pangenome ·Dendrobium Pangenome Analysis · 26 Species · OrthoFinder v2.5.5 · Mar 2026</footer>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 2 — ANALYSIS FIGURES  (interactive)
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-figures" class="tab-panel">
+<div class="fig-container">
+
+  <!-- ── Species Tree ──────────────────────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>🌳 Species Phylogeny</h4>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="fig-card">
+          <div class="fig-title">Species Tree with Gene Category Distribution</div>
+          <div class="fig-desc">
+            左側為 OrthoFinder 推斷的最大似然物種樹，枝長反映演化距離，節點數字為 bootstrap 支持值。
+            右側堆疊長條圖顯示每物種的基因組成：<b style="color:#2ca02c">Core</b>（所有物種共有）、
+            <b style="color:#1f77b4">Softcore</b>（≥95% 物種共有）、
+            <b style="color:#ff7f0e">Dispensable</b>（部分物種共有）、
+            <b style="color:#d62728">Private</b>（物種特有）。可評估哪些物種基因組較「開放」或「保守」。
+          </div>
+          <img src="img/species_tree.png" alt="Species Tree" onclick="openLightbox(this)">
+          <div class="fig-desc">
+            Data sources: <code>OrthoFinder/Species_Tree/SpeciesTree_rooted.txt</code> · <code>Statistics_PerSpecies.tsv</code> · <code>Pangenome/gene_classification_v2.tsv</code><br>
+            Script: <code>1.Scripts/plot_species_tree.py</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ortholog (interactive Plotly) ──────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>🔗 直系同源基因關係（Ortholog Relationships）</h4>
+    <div class="fig-desc" style="margin-bottom:.8rem; font-size:.85rem; color:#555; line-height:1.6;">
+      顯示任意兩物種之間共享的 <b>Orthogroup 數量</b>（含多基因拷貝）。
+      顏色越淺代表兩物種間共享的 Orthogroup 越多，演化關係越近；顏色越深代表共享越少，演化距離越遠。
+      <b>點擊格子</b>可在右側查看該物種對的共享與物種特有 Orthogroup 比例。
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="fig-card">
+          <div class="fig-title">物種間共享 Orthogroup 數量熱圖 — 點擊物種對查看詳情</div>
+          <div class="card-body p-2"><div id="chart-ortho-heatmap" style="min-height:520px;"></div></div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="fig-card h-100">
+          <div class="fig-title" id="ortho-detail-title">← 點擊左側熱圖中任一格</div>
+          <div class="card-body p-2">
+            <div id="chart-ortho-detail" style="min-height:260px;"></div>
+            <div id="ortho-detail-text" style="font-size:.82rem;color:#555;padding:.5rem .75rem;line-height:1.6;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ks (interactive Plotly heatmap + click → histogram) ────────────── -->
+  <div class="fig-section">
+    <h4>📈 同義替換率（Ks）分析</h4>
+    <div class="fig-desc" style="margin-bottom:.8rem; font-size:.85rem; color:#555; line-height:1.6;">
+      使用 MAFFT + PAL2NAL + yn00（Yang &amp; Nielsen 2000）計算共線性基因對的 Ks（同義替換率）。
+      Ks 越小代表分化越近。每對物種隨機抽取 200 個 300–3000 bp 共線性基因對計算，取中位數。
+      <b>點擊熱圖格子</b>可在右側查看該物種對的 Ks 分佈直方圖。
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="fig-card">
+          <div class="fig-title">26×26 物種對 Ks 中位數熱圖 — 點擊物種對查看分佈</div>
+          <div class="card-body p-2"><div id="chart-ks-heatmap" style="min-height:520px;"></div></div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="fig-card h-100">
+          <div class="fig-title" id="ks-detail-title">← 點擊左側熱圖中任一格</div>
+          <div class="card-body p-2">
+            <div id="chart-ks-dist" style="min-height:260px;"></div>
+            <div id="ks-detail-text" style="font-size:.82rem;color:#555;padding:.5rem .75rem;line-height:1.6;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dotplot picker ─────────────────────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>🔷 基因層級共線性點圖（Gene Collinearity Dotplots）</h4>
+    <div class="fig-desc" style="margin-bottom:.8rem; font-size:.85rem; color:#555; line-height:1.6;">
+      使用 Diamond blastp + JCVI MCScan 對全部 C(26,2)=325 對物種建立基因共線性區塊。
+      X/Y 軸為兩物種基因在染色體上的相對位置（依基因 BED 座標排列）。
+      對角線方向的連續點串代表 <b>共線性區塊</b>；偏離對角線的點可能為移位或倒位事件。
+      <b>選擇兩個物種</b>查看任意對的點圖，或點擊「全覽」查看 D. nobile vs 25 物種。
+    </div>
+
+    <!-- Species picker -->
+    <div class="row g-2 mb-3 align-items-end">
+      <div class="col-auto">
+        <label class="form-label fw-600 mb-1" style="font-size:.85rem;">物種 A</label>
+        <select id="dot-sp1" class="form-select form-select-sm" style="min-width:180px;font-style:italic;"></select>
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1" style="font-size:1.3rem;">⇄</div>
+      <div class="col-auto">
+        <label class="form-label fw-600 mb-1" style="font-size:.85rem;">物種 B</label>
+        <select id="dot-sp2" class="form-select form-select-sm" style="min-width:180px;font-style:italic;"></select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-success" onclick="loadDotplot()">顯示點圖</button>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadDotplotOverview()">全覽 (D.nobile × 25)</button>
+      </div>
+    </div>
+
+    <div class="fig-card">
+      <div class="fig-title" id="dotplot-title">請選擇物種對</div>
+      <div id="dotplot-wrap" style="min-height:300px; display:flex; align-items:center; justify-content:center; background:#f8f9fa;">
+        <span style="color:#aaa; font-size:.9rem;">↑ 從上方選擇兩個物種後點擊「顯示點圖」</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /fig-container -->
+<footer>Dendrobium Pangenome ·Analysis Figures · 26 Species · Mar 2026</footer>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 3 — GENOME BROWSER
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-browser" class="tab-panel">
+  <div class="browser-wrap">
+    <div class="browser-toolbar">
+      <strong>JBrowse2</strong>
+      <span class="url-badge">localhost:9000</span>
+      <span>· 26 species · 983 tracks · MCScan synteny + SyRI SVs (298/325 pairs)</span>
+      <span class="info">Open in new tab: <a href="http://localhost:9000" target="_blank">↗</a></span>
+    </div>
+    <iframe id="jbrowse-frame" src="about:blank" allowfullscreen
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"></iframe>
+  </div>
+</div>
+
+<div id="tab-seqserver" class="tab-panel">
+  <div class="browser-wrap">
+    <div class="browser-toolbar">
+      <strong>SequenceServer</strong>
+      <span class="url-badge">localhost:4568</span>
+      <span>· 26 species · Protein (blastp) + CDS (blastn) · 737,041 sequences each</span>
+      <span class="info">Open in new tab: <a href="http://localhost:4568" target="_blank">↗</a></span>
+    </div>
+    <iframe id="seqserver-frame" src="about:blank" allowfullscreen
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation allow-modals"></iframe>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB — RNA-seq Analysis (Native)
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-rnaseq" class="tab-panel">
+  <div class="rnaseq-layout">
+
+    <!-- ── Left sidebar controls ── -->
+    <div class="rnaseq-sidebar">
+
+      <div class="rnaseq-section-title">PCA 設定</div>
+      <div id="rnaseq-group-checks" class="rnaseq-group-checks">
+        <!-- populated by initRnaseq() -->
+        <span style="font-size:.78rem;color:var(--text-muted);">載入中…</span>
+      </div>
+      <button class="run-btn run-btn-pca" onclick="runPCA()">執行 PCA</button>
+
+      <hr class="rnaseq-divider">
+
+      <div class="rnaseq-section-title">差異表現分析 (DESeq2)</div>
+
+      <label class="rnaseq-form-label">Group A（實驗組）</label>
+      <select id="de-group-a" class="rnaseq-select">
+        <option>BB</option><option>BF</option><option>MB</option>
+        <option>SB</option><option>WF</option><option>Dth</option>
+      </select>
+
+      <label class="rnaseq-form-label">Group B（對照組）</label>
+      <select id="de-group-b" class="rnaseq-select">
+        <option>BB</option><option>BF</option><option>MB</option>
+        <option>SB</option><option selected>WF</option><option>Dth</option>
+      </select>
+
+      <label class="rnaseq-form-label">組織篩選</label>
+      <select id="de-tissue" class="rnaseq-select">
+        <option value="">全部</option>
+        <option>co</option><option>li</option><option>pe</option><option>se</option>
+        <option>l</option><option>r</option><option>s</option>
+      </select>
+
+      <label class="rnaseq-form-label">padj cutoff</label>
+      <input type="number" id="de-padj" class="rnaseq-number" value="0.05" min="0" max="1" step="0.01">
+
+      <label class="rnaseq-form-label">|log2FC| cutoff</label>
+      <input type="number" id="de-lfc" class="rnaseq-number" value="1.0" min="0" step="0.1">
+
+      <button class="run-btn run-btn-de" onclick="runDESeq2()">執行 DESeq2</button>
+
+      <hr class="rnaseq-divider">
+
+      <div id="rnaseq-status" class="rnaseq-status"></div>
+
+      <div style="margin-top:1rem;font-size:.74rem;color:var(--text-muted);line-height:1.6;">
+        <strong style="color:var(--text);">資料來源</strong><br>
+        Dth_all68_gene_counts.tsv<br>
+        28,696 genes × 68 samples<br>
+        Groups: BB BF MB SB WF Dth
+      </div>
+    </div>
+
+    <!-- ── Right main panel ── -->
+    <div class="rnaseq-main">
+
+      <!-- Inner tab bar -->
+      <div class="rnaseq-inner-tabs">
+        <button class="rnaseq-inner-tab active" onclick="showRnaseqTab('pca',this)">PCA</button>
+        <button class="rnaseq-inner-tab" onclick="showRnaseqTab('volcano',this)">Volcano</button>
+        <button class="rnaseq-inner-tab" onclick="showRnaseqTab('topdegs',this)">Top DEGs</button>
+        <button class="rnaseq-inner-tab" onclick="showRnaseqTab('table',this)">結果表格</button>
+      </div>
+
+      <!-- Stat summary row (shown after DESeq2) -->
+      <div id="rnaseq-stats-row" class="rnaseq-stats" style="display:none;">
+        <div class="rnaseq-stat-card"><strong id="stat-comparison">—</strong>比較</div>
+        <div class="rnaseq-stat-card"><strong id="stat-n-up" style="color:#E64B35;">—</strong>Up-regulated</div>
+        <div class="rnaseq-stat-card"><strong id="stat-n-down" style="color:#3C5488;">—</strong>Down-regulated</div>
+        <div class="rnaseq-stat-card"><strong id="stat-n-a">—</strong>Samples A</div>
+        <div class="rnaseq-stat-card"><strong id="stat-n-b">—</strong>Samples B</div>
+      </div>
+
+      <!-- PCA panel -->
+      <div id="rnaseq-panel-pca" class="rnaseq-inner-panel active">
+        <div id="chart-rnaseq-pca" style="min-height:480px;">
+          <div class="rnaseq-placeholder">
+            <span style="font-size:2rem;">📊</span>
+            <span>選擇樣本群組後點擊「執行 PCA」</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volcano panel -->
+      <div id="rnaseq-panel-volcano" class="rnaseq-inner-panel">
+        <div id="chart-rnaseq-volcano" style="min-height:480px;">
+          <div class="rnaseq-placeholder">
+            <span style="font-size:2rem;">🌋</span>
+            <span>執行 DESeq2 後顯示 Volcano Plot</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top DEGs panel -->
+      <div id="rnaseq-panel-topdegs" class="rnaseq-inner-panel">
+        <div id="chart-rnaseq-topdegs" style="min-height:480px;">
+          <div class="rnaseq-placeholder">
+            <span style="font-size:2rem;">📈</span>
+            <span>執行 DESeq2 後顯示 Top 20 DEGs</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result table panel -->
+      <div id="rnaseq-panel-table" class="rnaseq-inner-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;">
+          <span id="deg-table-info" style="font-size:.82rem;color:var(--text-muted);">尚未執行分析</span>
+          <button onclick="downloadDEGcsv()" style="font-size:.78rem;padding:3px 12px;border:1px solid var(--border);border-radius:4px;background:white;cursor:pointer;">⬇ CSV</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="deg-table">
+            <thead>
+              <tr>
+                <th>Gene</th>
+                <th>log2FC</th>
+                <th>padj</th>
+                <th>baseMean</th>
+                <th>Regulation</th>
+              </tr>
+            </thead>
+            <tbody id="deg-tbody">
+              <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">執行 DESeq2 後顯示結果</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /rnaseq-main -->
+  </div><!-- /rnaseq-layout -->
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 4 — FUNCTIONAL ANNOTATION (eggNOG-mapper v2)
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-annotation" class="tab-panel">
+<div class="fig-container">
+
+  <!-- ── Annotation Stats ──────────────────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>📋 功能注釋概覽（eggNOG-mapper v2）</h4>
+    <div class="fig-desc" style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:.8rem;">
+      使用 eggNOG-mapper v2（sensitive 模式）對 26 個石斛物種的蛋白質序列進行功能注釋，
+      比對 eggNOG v5 資料庫。下圖顯示每個物種的注釋基因數量，以及帶有 GO terms、KEGG ortholog、KEGG pathway 的基因數量。
+      <b>點擊下拉選單切換指標。</b>
+    </div>
+    <div class="row g-2 mb-2 align-items-center">
+      <div class="col-auto">
+        <select id="annot-metric" class="form-select form-select-sm">
+          <option value="n_annotated">注釋基因數</option>
+          <option value="n_go">有 GO terms 的基因數</option>
+          <option value="n_kegg_ko">有 KEGG KO 的基因數</option>
+          <option value="n_kegg_pathway">有 KEGG Pathway 的基因數</option>
+          <option value="n_cog">有 COG 分類的基因數</option>
+        </select>
+      </div>
+    </div>
+    <div class="fig-card">
+      <div class="card-body p-2"><div id="chart-annot-bar" style="min-height:380px;"></div></div>
+    </div>
+  </div>
+
+  <!-- ── COG Distribution ──────────────────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>🗂️ COG 功能分類分佈</h4>
+    <div class="fig-desc" style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:.8rem;">
+      COG（Clusters of Orthologous Groups）將基因分為 24 個功能類別（A–Z）。
+      熱圖顯示各物種在每個 COG 類別中的基因數量，顏色越深代表該功能類別的基因越多。
+      <b>點擊熱圖中任一格</b>可在右側查看該物種的 COG 分佈長條圖。
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="fig-card">
+          <div class="fig-title">COG 功能類別 × 26 物種熱圖（點擊查看物種詳情）</div>
+          <div class="card-body p-2"><div id="chart-cog-heatmap" style="min-height:500px;"></div></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="fig-card h-100">
+          <div class="fig-title" id="cog-detail-title">← 點擊左側熱圖</div>
+          <div class="card-body p-2">
+            <div id="chart-cog-detail" style="min-height:400px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- ── Species Gene Table ───────────────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>Gene Annotation Table — Per Species</h4>
+    <div class="fig-desc">
+      Select a species to browse the full gene-level eggNOG-mapper annotation table.
+      GO terms are displayed as clickable badges linking to QuickGO.
+      Supports full-text search (Gene ID, name, description, GO ID) and sorting by any column.
+    </div>
+
+    <!-- Species picker -->
+    <div class="row g-2 mb-3 align-items-center">
+      <div class="col-auto">
+        <label class="fw-600 me-1" style="font-size:.8rem;">Species:</label>
+        <select id="sp-table-select" class="form-select form-select-sm d-inline-block" style="width:220px;font-style:italic;"></select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-primary" onclick="loadSpeciesTable()" style="font-size:.78rem;padding:4px 14px;">Load Table</button>
+      </div>
+      <div class="col-auto ms-2">
+        <input type="text" id="table-search" placeholder="Search gene ID, name, description, GO ID…" oninput="filterTable()">
+      </div>
+      <div class="col-auto">
+        <select id="cog-filter" onchange="filterTable()">
+          <option value="">All COG categories</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary" onclick="downloadTSV()" id="btn-download-tsv" style="font-size:.78rem;display:none;">Download TSV</button>
+      </div>
+      <div class="col-auto ms-auto" id="table-count" style="font-size:.78rem;color:var(--text-muted);"></div>
+    </div>
+
+    <div class="fig-card" id="sp-table-card" style="display:none;">
+      <div class="fig-title" id="sp-table-title"></div>
+      <div id="sp-table-wrap">
+        <table id="sp-table">
+          <thead>
+            <tr>
+              <th onclick="sortTable(0)" data-col="0">Gene ID<span class="sort-icon"></span></th>
+              <th onclick="sortTable(1)" data-col="1">Preferred Name<span class="sort-icon"></span></th>
+              <th onclick="sortTable(2)" data-col="2">COG<span class="sort-icon"></span></th>
+              <th onclick="sortTable(3)" data-col="3" style="min-width:220px;">Description<span class="sort-icon"></span></th>
+              <th data-col="4" style="min-width:180px;">GO Terms</th>
+              <th onclick="sortTable(5)" data-col="5">KEGG KO<span class="sort-icon"></span></th>
+              <th onclick="sortTable(6)" data-col="6">KEGG Pathway<span class="sort-icon"></span></th>
+              <th onclick="sortTable(7)" data-col="7">Pfam<span class="sort-icon"></span></th>
+              <th onclick="sortTable(8)" data-col="8">EC<span class="sort-icon"></span></th>
+            </tr>
+          </thead>
+          <tbody id="sp-table-body"></tbody>
+        </table>
+      </div>
+      <!-- Pagination -->
+      <div class="d-flex align-items-center gap-2 p-2 border-top" style="border-color:var(--border)!important;background:#f8fafc;">
+        <div class="table-pagination">
+          <button id="pg-first" onclick="goPage(0)">&#171; First</button>
+          <button id="pg-prev" onclick="goPage(curPage-1)">&#8249; Prev</button>
+          <span class="page-info" id="pg-info"></span>
+          <button id="pg-next" onclick="goPage(curPage+1)">Next &#8250;</button>
+          <button id="pg-last" onclick="goPage(totalPages-1)">Last &#187;</button>
+        </div>
+        <div class="ms-3" style="font-size:.78rem;color:var(--text-muted);">
+          Rows per page:
+          <select id="pg-size" onchange="changePageSize()" style="border:1px solid var(--border);border-radius:3px;padding:2px 5px;font-size:.78rem;">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="sp-table-loading" style="display:none;padding:2rem;text-align:center;color:var(--text-muted);font-size:.85rem;">
+      Loading annotation data…
+    </div>
+  </div>
+
+  <!-- ── Download Section ──────────────────────────────────────────────── -->
+  <div class="fig-section">
+    <h4>Data Download</h4>
+    <div class="fig-desc" style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:1rem;">
+      Download the full eggNOG-mapper v2 annotation file for each species.
+      Format: tab-separated, 21 columns including COG, GO terms, KEGG KO/Pathway, Pfam, EC number.
+    </div>
+    <div id="download-links" style="display:flex;flex-wrap:wrap;gap:.5rem;"></div>
+  </div>
+
+</div><!-- /fig-container -->
+<footer>Dendrobium Pangenome &nbsp;·&nbsp; Functional Annotation &nbsp;·&nbsp; eggNOG-mapper v2 &nbsp;·&nbsp; 26 Dendrobium species</footer>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB — VIGS DESIGN
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-vigs" class="tab-panel">
+<div class="rnaseq-layout">
+
+  <!-- Left: controls -->
+  <div class="rnaseq-sidebar">
+
+    <div class="rnaseq-section-title">從資料庫選基因</div>
+    <label style="font-size:.8rem;display:block;margin-bottom:.25rem;">來源物種</label>
+    <select id="vigs-src-sp" onchange="vigsLoadGenes()"
+      style="width:100%;padding:.35rem;border:1px solid var(--border);border-radius:4px;font-size:.82rem;margin-bottom:.5rem;">
+      <option value="">— 選擇物種 —</option>
+    </select>
+    <label style="font-size:.8rem;display:block;margin-bottom:.25rem;">搜尋基因 ID</label>
+    <div style="display:flex;gap:.3rem;margin-bottom:.4rem;">
+      <input id="vigs-gene-q" type="text" placeholder="輸入基因 ID..."
+        oninput="vigsSearchGenes()"
+        style="flex:1;padding:.35rem;border:1px solid var(--border);border-radius:4px;font-size:.82rem;">
+      <button onclick="vigsLoadSeq()" title="載入序列"
+        style="background:var(--npg-teal);color:white;border:none;padding:.35rem .6rem;border-radius:4px;cursor:pointer;font-size:.82rem;">↓</button>
+    </div>
+    <select id="vigs-gene-list" size="5" onchange="document.getElementById('vigs-gene-q').value=this.value"
+      style="width:100%;font-family:monospace;font-size:.76rem;border:1px solid var(--border);border-radius:4px;margin-bottom:.6rem;"></select>
+
+    <div class="rnaseq-section-title">或手動貼入序列</div>
+    <textarea id="vigs-seq" rows="5" placeholder=">MyGene&#10;ATGCGTACGT..."
+      style="width:100%;font-family:monospace;font-size:.75rem;padding:.4rem;border:1px solid var(--border);border-radius:4px;resize:vertical;"></textarea>
+
+    <div class="rnaseq-section-title" style="margin-top:.8rem;">比對目標物種</div>
+    <select id="vigs-db-sp"
+      style="width:100%;padding:.35rem;border:1px solid var(--border);border-radius:4px;font-size:.82rem;margin-bottom:.6rem;">
+      <option value="">載入中…</option>
+    </select>
+
+    <div class="rnaseq-section-title">參數</div>
+    <label style="font-size:.82rem;display:block;margin-bottom:.25rem;">n-mer 大小 <small style="color:var(--text-muted)">(siRNA 長度)</small></label>
+    <input type="number" id="vigs-mer" value="21" min="18" max="24"
+      style="width:100%;padding:.35rem;border:1px solid var(--border);border-radius:4px;font-size:.84rem;margin-bottom:.5rem;">
+    <label style="font-size:.82rem;display:block;margin-bottom:.25rem;">片段長度 <small style="color:var(--text-muted)">(bp，VIGS 構建大小)</small></label>
+    <input type="number" id="vigs-frag" value="300" min="100" max="2000"
+      style="width:100%;padding:.35rem;border:1px solid var(--border);border-radius:4px;font-size:.84rem;margin-bottom:.5rem;">
+    <label style="font-size:.82rem;display:block;margin-bottom:.25rem;">容許 mismatch 數</label>
+    <select id="vigs-mm" style="width:100%;padding:.35rem;border:1px solid var(--border);border-radius:4px;font-size:.84rem;margin-bottom:.8rem;">
+      <option value="0">0（完全比對）</option>
+      <option value="1" selected>1（建議）</option>
+      <option value="2">2（寬鬆）</option>
+    </select>
+
+    <button class="run-btn run-btn-de" onclick="runVIGS()">執行 VIGS 分析</button>
+
+    <div id="vigs-status" class="rnaseq-status"></div>
+
+    <div style="margin-top:1.2rem;padding:.7rem;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;font-size:.76rem;line-height:1.6;color:#5d4037;">
+      <strong>VIGS 工具說明</strong><br>
+      輸入目標基因片段（200–500 bp），系統將切割成 <em>n</em>-mer 後比對至
+      <em>D. thyrsiflorum</em> CDS 資料庫，列出可能被脫靶沉默的基因。<br><br>
+      <strong>結果解讀：</strong><br>
+      Coverage 越高 → 脫靶風險越大<br>
+      目標基因本身通常出現在第一名
+    </div>
+  </div>
+
+  <!-- Right: results -->
+  <div class="rnaseq-main">
+    <div id="vigs-summary" style="display:none;" class="rnaseq-stats">
+      <div class="rnaseq-stat-card"><strong id="vs-seqlen">—</strong>序列長度 (bp)</div>
+      <div class="rnaseq-stat-card"><strong id="vs-mers">—</strong>n-mer 片段數</div>
+      <div class="rnaseq-stat-card"><strong id="vs-mapped">—</strong>比對成功 (%)</div>
+      <div class="rnaseq-stat-card"><strong id="vs-genes">—</strong>命中基因數</div>
+      <div class="rnaseq-stat-card"><strong id="vs-score" style="color:#00A087;">—</strong>最佳分數 (0–100)</div>
+    </div>
+
+    <!-- N-mer distribution chart -->
+    <div id="vigs-dist-chart" style="height:300px;display:none;"></div>
+
+    <!-- Best construct FASTA -->
+    <div id="vigs-construct" style="display:none;margin:.8rem 0;padding:.8rem 1rem;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+        <strong style="font-size:.9rem;color:#166534;">推薦構建序列（最佳片段）</strong>
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <span id="vigs-construct-range" style="font-size:.78rem;color:#166534;"></span>
+          <button onclick="copyConstruct()" style="background:#16a34a;color:white;border:none;padding:.25rem .7rem;border-radius:4px;cursor:pointer;font-size:.78rem;">複製 FASTA</button>
+          <button onclick="downloadConstruct()" style="background:#0e7490;color:white;border:none;padding:.25rem .7rem;border-radius:4px;cursor:pointer;font-size:.78rem;">下載</button>
+        </div>
+      </div>
+      <pre id="vigs-construct-seq" style="font-family:monospace;font-size:.75rem;background:white;padding:.6rem;border-radius:4px;border:1px solid #bbf7d0;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto;margin:0;"></pre>
+    </div>
+
+    <div id="vigs-chart" style="height:380px;display:none;"></div>
+
+    <div id="vigs-table-wrap" style="margin-top:1rem;display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+        <strong style="font-size:.9rem;">比對命中基因（Top 100）</strong>
+        <button onclick="downloadVIGScsv()" style="background:var(--npg-teal);color:white;border:none;padding:.3rem .8rem;border-radius:4px;cursor:pointer;font-size:.78rem;">下載 CSV</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="vigs-table" style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <thead>
+            <tr style="background:var(--bg-alt);border-bottom:2px solid var(--border);">
+              <th style="padding:.4rem .6rem;text-align:left;">排名</th>
+              <th style="padding:.4rem .6rem;text-align:left;">基因 ID</th>
+              <th style="padding:.4rem .6rem;text-align:right;">命中 n-mer 數</th>
+              <th style="padding:.4rem .6rem;text-align:right;">覆蓋率 (%)</th>
+              <th style="padding:.4rem .6rem;text-align:left;">風險評估</th>
+            </tr>
+          </thead>
+          <tbody id="vigs-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="vigs-placeholder" style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--text-muted);flex-direction:column;gap:.8rem;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span>輸入序列後點擊「執行 VIGS 分析」</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB — VIGS ORIGINAL (SGN Docker)
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-vigs-orig" class="tab-panel">
+<div style="padding:.6rem 1rem .4rem;background:#fff8e1;border-bottom:1px solid #ffe082;display:flex;align-items:center;gap:1rem;font-size:.82rem;">
+  <span>🧬 <strong>SGN VIGS Tool 原版</strong> — 使用原版 Perl/Bowtie1 演算法，資料庫已替換為 26 個石斛蘭物種 CDS</span>
+  <span id="vigs-orig-status" style="color:#666;">（載入中…）</span>
+  <a href="http://localhost:9004" target="_blank"
+     style="margin-left:auto;background:var(--npg-blue);color:white;padding:.25rem .7rem;border-radius:4px;text-decoration:none;font-size:.78rem;">在新分頁開啟 ↗</a>
+</div>
+<iframe id="vigs-orig-frame"
+  style="width:100%;height:calc(100vh - 110px);border:none;display:block;"
+  src="about:blank">
+</iframe>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 5 — METHODS
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-methods" class="tab-panel">
+<div class="fig-container" style="max-width:860px;">
+
+  <div class="section-title">Materials and Methods</div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Genome Data and Preprocessing</div>
+    <div class="card-body" style="font-size:.88rem;line-height:1.75;">
+      <p>Genome assemblies and predicted protein sequences for 26 <em>Dendrobium</em> species were used as input for all downstream analyses. For species where multiple independent genome assemblies were publicly available (namely <em>D. catenatum</em>, <em>D. nobile</em>, <em>D. secundum</em>, <em>D. thyrsiflorum</em>, <em>D. lindleyi</em>, and <em>D. chrysotoxum</em>), the assembly whose gene identifiers were consistent with the pangenome reference used in this study was selected; NCBI RefSeq annotations carrying gene ID prefixes (KAI, KAH, PKU) derived from alternative assemblies were excluded to ensure cross-species identifier consistency. Protein sequences were filtered to retain only the primary isoform per locus (longest CDS-supported isoform) using a custom Python script prior to ortholog inference.</p>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Pangenome Construction and Phylogenetic Analysis</div>
+    <div class="card-body" style="font-size:.88rem;line-height:1.75;">
+      <h6 class="fw-600 mb-2">Ortholog Inference</h6>
+      <p>Orthologous gene groups (orthogroups) across all 26 species were identified using OrthoFinder v2.5.5. All-versus-all protein sequence similarity searches were performed using Diamond v2.1.12 with default OrthoFinder parameters. Orthologous clustering was performed using the Markov Cluster Algorithm (MCL) with an inflation parameter of 1.5. OrthoFinder was executed with 32 threads for sequence search (<code>-t 32</code>) and 8 threads for analysis (<code>-a 8</code>):</p>
+      <pre style="background:var(--bg-alt);border:1px solid var(--border);border-radius:4px;padding:.6rem 1rem;font-size:.80rem;">orthofinder -f pep_cleaned/ -t 32 -a 8 -o orthofinder_results/</pre>
+
+      <h6 class="fw-600 mt-3 mb-2">Pangenome Gene Classification</h6>
+      <p>Orthogroups were classified into four categories based on their presence across the 26 species:</p>
+      <ul style="margin-bottom:.5rem;">
+        <li><strong>Core genome</strong>: orthogroups present in all 26 species (100%)</li>
+        <li><strong>Softcore genome</strong>: orthogroups present in ≥ 24 species (≥ 94%)</li>
+        <li><strong>Dispensable genome</strong>: orthogroups present in 2–23 species</li>
+        <li><strong>Private genome</strong>: orthogroups unique to a single species</li>
+      </ul>
+
+      <h6 class="fw-600 mt-3 mb-2">Species Phylogeny</h6>
+      <p>A rooted species phylogeny was inferred from the OrthoFinder results using the STAG (Species Tree from All Genes) method. Individual gene trees were constructed using FastTree for each of the 322 single-copy orthogroups. The consensus species tree was rooted using the STRIDE algorithm and visualised using the ETE3 toolkit.</p>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Synteny Analysis</div>
+    <div class="card-body" style="font-size:.88rem;line-height:1.75;">
+      <h6 class="fw-600 mb-2">Whole-Genome Pairwise Alignment</h6>
+      <p>Chromosome-level synteny was assessed for all C(26, 2) = 325 pairwise combinations using minimap2 v2.28:</p>
+      <pre style="background:var(--bg-alt);border:1px solid var(--border);border-radius:4px;padding:.6rem 1rem;font-size:.80rem;">minimap2 -c -x asm5 -t 4 {target.fa} {query.fa} &gt; {output.paf}</pre>
+
+      <h6 class="fw-600 mt-3 mb-2">Gene-Level Collinearity</h6>
+      <p>Syntenic gene blocks were identified for all 325 species pairs using JCVI v1.5.11. Protein sequences were compared using Diamond v2.1.12 in BLASTp mode (E-value ≤ 1×10⁻⁵), then syntenic blocks were detected with:</p>
+      <pre style="background:var(--bg-alt);border:1px solid var(--border);border-radius:4px;padding:.6rem 1rem;font-size:.80rem;">python -m jcvi.compara.synteny scan \
+    {sp1.sp2.blast} {sp1.sp2.anchors} \
+    --qbed {sp1.bed} --sbed {sp2.bed} \
+    --no_strip_names --dist=20 --min_size=4</pre>
+      <p>Parameters: <code>--dist=20</code> (maximum rank-distance between collinear pairs), <code>--min_size=4</code> (minimum anchor pairs per block).</p>
+
+      <h6 class="fw-600 mt-3 mb-2">Synonymous Substitution Rate (Ks) and Ka/Ks Estimation</h6>
+      <p>For each of the 325 species pairs, up to 200 syntenic gene pairs were randomly sampled from the JCVI <code>.anchors</code> file. Gene pairs were pre-filtered to include only those where both CDS were between 300 and 3,000 bp. Ks and Ka values were estimated using a three-step pipeline:</p>
+      <ol>
+        <li>Protein alignment with MAFFT v7.525 (<code>--auto --quiet</code>)</li>
+        <li>Protein-to-codon alignment conversion with PAL2NAL (<code>-output paml -nogap</code>)</li>
+        <li>Ka/Ks estimation with yn00 from PAML v4.9j (Yang &amp; Nielsen 2000 ML method; <code>icode=0</code>, standard genetic code)</li>
+      </ol>
+      <p>Median Ks values per species pair were used to construct the 26×26 pairwise Ks matrix.</p>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Structural Variant Detection</div>
+    <div class="card-body" style="font-size:.88rem;line-height:1.75;">
+      <p>Inter-species structural variants (SVs) were identified for all 325 species pairs using SyRI v1.x. Analysis was performed on a per-chromosome basis, restricted to chromosomes ≥ 5 Mbp, matched by rank order. Per-chromosome pairwise alignment was performed using nucmer from MUMmer4:</p>
+      <pre style="background:var(--bg-alt);border:1px solid var(--border);border-radius:4px;padding:.6rem 1rem;font-size:.80rem;">nucmer -c 500 -b 500 -l 100 --prefix {prefix} {ref.fa} {qry.fa}
+delta-filter -m -i 90 -l 100 {input.delta} &gt; {filtered.delta}
+syri -c {coords} -d {filtered.delta} -r {ref.fa} -q {qry.fa} --nc 2 --all --log WARN</pre>
+      <p>For 298 of 325 species pairs, a minimum alignment identity of 90% was applied. The remaining 27 pairs — predominantly involving <em>D. parcum</em>, <em>D. spatella</em>, <em>D. secundum</em>, and <em>D.</em> ChaoPraya Smile — failed to yield SV calls even at a relaxed threshold of 70%, reflecting genuine large-scale sequence divergence. Structural variant analysis was successfully completed for <strong>298 of 325 species pairs</strong> (91.7%). Per-chromosome SyRI VCF outputs were merged, compressed with bgzip, and indexed with tabix for genome browser integration.</p>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Functional Annotation</div>
+    <div class="card-body" style="font-size:.88rem;line-height:1.75;">
+      <p>Functional annotations were assigned to the predicted protein sequences of all 26 species using eggNOG-mapper v2.1.13 against the eggNOG v5.0.2 database, with Diamond v2.1.12 as the sequence search engine. The following annotation categories were extracted and summarised per species:</p>
+      <ul>
+        <li>COG functional categories (Clusters of Orthologous Groups)</li>
+        <li>Gene Ontology (GO) terms</li>
+        <li>KEGG Orthology (KO) identifiers and metabolic pathway assignments</li>
+        <li>Pfam domain identifiers</li>
+        <li>Enzyme Commission (EC) numbers</li>
+      </ul>
+      <p>For comparative visualisation, the 30 most abundant KEGG pathways and 25 most abundant Pfam domains aggregated across all 26 species were selected.</p>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Sequence Similarity Search (BLAST)</div>
+    <div class="card-body" style="font-size:.88rem;line-height:1.7;">
+      <p>An interactive BLAST search interface is provided to query user-supplied sequences against the predicted protein and CDS databases of all 26 <em>Dendrobium</em> species. Custom BLAST databases were constructed using BLAST+ v2.x <code>makeblastdb</code> from the protein (<code>*.pep.fa</code>) and coding sequence (<code>*.cds.fa</code>) files of all 26 species. Each sequence header was prefixed with a species identifier (<code>{sp_id}|{gene_id}</code>) to enable per-species hit attribution. Non-standard residues (<code>.</code>, <code>-</code>) were converted to <code>X</code> prior to database construction; sequences shorter than 10 residues were excluded. The combined databases contain 737,041 protein sequences and 737,041 CDS sequences.</p>
+      <p>Protein queries are searched using <code>blastp</code>; nucleotide queries are searched using <code>blastn</code> against the CDS database. Query type is auto-detected from sequence composition (nucleotide ratio &gt;90% → blastn). Users may restrict the search to any subset of the 26 species. For each species, only the single best-scoring HSP per subject sequence is reported. The search is executed server-side via a Flask/Gunicorn API co-hosted with the dashboard on the same port.</p>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">Software and Versions</div>
+    <div class="card-body" style="font-size:.88rem;">
+      <table class="table table-sm table-bordered mb-0" style="font-size:.83rem;">
+        <thead class="table-light"><tr><th>Tool</th><th>Version</th><th>Reference</th></tr></thead>
+        <tbody>
+          <tr><td>OrthoFinder</td><td>2.5.5</td><td>Emms &amp; Kelly, 2019</td></tr>
+          <tr><td>Diamond</td><td>2.1.12</td><td>Buchfink et al., 2021</td></tr>
+          <tr><td>minimap2</td><td>2.28-r1209</td><td>Li, 2018</td></tr>
+          <tr><td>JCVI</td><td>1.5.11</td><td>Tang et al., 2008</td></tr>
+          <tr><td>MUMmer4 (nucmer)</td><td>4.0.0rc1</td><td>Marçais et al., 2018</td></tr>
+          <tr><td>SyRI</td><td>1.x</td><td>Goel et al., 2019</td></tr>
+          <tr><td>MAFFT</td><td>7.525</td><td>Katoh &amp; Standley, 2013</td></tr>
+          <tr><td>PAL2NAL</td><td>—</td><td>Suyama et al., 2006</td></tr>
+          <tr><td>PAML (yn00)</td><td>4.9j</td><td>Yang, 2007</td></tr>
+          <tr><td>eggNOG-mapper</td><td>2.1.13</td><td>Cantalapiedra et al., 2021</td></tr>
+          <tr><td>eggNOG database</td><td>5.0.2</td><td>Huerta-Cepas et al., 2019</td></tr>
+          <tr><td>ETE3</td><td>—</td><td>Huerta-Cepas et al., 2016</td></tr>
+          <tr><td>JBrowse2</td><td>2.x</td><td>Diesh et al., 2023</td></tr>
+          <tr><td>BLAST+</td><td>2.x</td><td>Camacho et al., 2009</td></tr>
+          <tr><td>Flask</td><td>3.x</td><td>Pallets Projects</td></tr>
+          <tr><td>Gunicorn</td><td>25.x</td><td>Benoît Chesneau</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card chart-card mb-4">
+    <div class="card-header">References</div>
+    <div class="card-body" style="font-size:.83rem;line-height:1.8;">
+      <p>Buchfink B, Reuter K, Drost H-G (2021). Sensitive protein alignments at tree-of-life scale using DIAMOND. <em>Nat Methods</em> 18:366–368.</p>
+      <p>Cantalapiedra CP, et al. (2021). eggNOG-mapper v2: functional annotation, orthology assignments, and domain prediction at the metagenomic scale. <em>Mol Biol Evol</em> 38:5825–5829.</p>
+      <p>Diesh C, et al. (2023). JBrowse 2: a modular genome browser with views of synteny and structural variation. <em>Genome Biol</em> 24:74.</p>
+      <p>Emms DM, Kelly S (2017). STRIDE: Species Tree Root Inference from Gene Duplication Events. <em>Mol Biol Evol</em> 34:3267–3278.</p>
+      <p>Emms DM, Kelly S (2018). STAG: Species Tree Inference from All Genes. <em>bioRxiv</em> doi:10.1101/267914.</p>
+      <p>Emms DM, Kelly S (2019). OrthoFinder: phylogenetic orthology inference for comparative genomics. <em>Genome Biol</em> 20:238.</p>
+      <p>Goel M, et al. (2019). SyRI: finding genomic rearrangements and local sequence differences from whole-genome assemblies. <em>Genome Biol</em> 20:277.</p>
+      <p>Huerta-Cepas J, et al. (2016). ETE 3: reconstruction, analysis, and visualization of phylogenomic data. <em>Mol Biol Evol</em> 33:1635–1638.</p>
+      <p>Huerta-Cepas J, et al. (2019). eggNOG 5.0: a hierarchical, functionally and phylogenetically annotated orthology resource. <em>Nucleic Acids Res</em> 47:D309–D314.</p>
+      <p>Katoh K, Standley DM (2013). MAFFT multiple sequence alignment software version 7. <em>Mol Biol Evol</em> 30:772–780.</p>
+      <p>Li H (2018). Minimap2: pairwise alignment for nucleotide sequences. <em>Bioinformatics</em> 34:3094–3100.</p>
+      <p>Marçais G, et al. (2018). MUMmer4: a fast and versatile genome alignment system. <em>PLOS Comput Biol</em> 14:e1005944.</p>
+      <p>Suyama M, Torrents D, Bork P (2006). PAL2NAL: robust conversion of protein sequence alignments into the corresponding codon alignments. <em>Nucleic Acids Res</em> 34:W609–W612.</p>
+      <p>Tang H, et al. (2008). Synteny and collinearity in plant genomes. <em>Science</em> 320:486–488.</p>
+      <p>Tatusov RL, et al. (2000). The COG database: a tool for genome-scale analysis of protein functions and evolution. <em>Nucleic Acids Res</em> 28:33–36.</p>
+      <p>Tettelin H, et al. (2005). Genome analysis of multiple pathogenic isolates of <em>Streptococcus agalactiae</em>: implications for the microbial "pan-genome". <em>Proc Natl Acad Sci USA</em> 102:13950–13955.</p>
+      <p>Camacho C, et al. (2009). BLAST+: architecture and applications. <em>BMC Bioinformatics</em> 10:421.</p>
+      <p>Yang Z (2007). PAML 4: phylogenetic analysis by maximum likelihood. <em>Mol Biol Evol</em> 24:1586–1591.</p>
+      <p>Yang Z, Nielsen R (2000). Estimating synonymous and nonsynonymous substitution rates under realistic evolutionary models. <em>Mol Biol Evol</em> 17:32–43.</p>
+    </div>
+  </div>
+
+</div><!-- /fig-container -->
+<footer>Dendrobium Pangenome &nbsp;·&nbsp; Materials and Methods &nbsp;·&nbsp; 26 Dendrobium species &nbsp;·&nbsp; Mar 2026</footer>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TAB 6 — BLAST SEARCH
+═══════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-blast" class="tab-panel">
+<div class="fig-container" style="max-width:960px;">
+
+  <div class="section-title">Sequence Search (BLAST)</div>
+
+  <!-- Query card -->
+  <div class="card chart-card mb-3">
+    <div class="card-header">Query Sequence</div>
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-12">
+          <textarea id="blast-query" class="form-control font-monospace"
+            rows="6" placeholder="輸入蛋白質或核酸序列（FASTA 格式或純序列）&#10;&#10;例：&gt;my_protein&#10;MSKGEIAQFKDAIFKELRTKS..."></textarea>
+        </div>
+
+        <!-- Species selector -->
+        <div class="col-12">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">
+            搜尋物種
+            <span id="blast-sp-badge" class="badge rounded-pill ms-1" style="background:var(--npg-navy);font-size:.68rem;">全部 26 個</span>
+          </label>
+          <div style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--bg-alt);">
+            <div class="d-flex gap-2 mb-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:.72rem;" onclick="blastSelectAll()">全選</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:.72rem;" onclick="blastSelectNone()">全清</button>
+            </div>
+            <div id="blast-sp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px 12px;max-height:130px;overflow-y:auto;"></div>
+          </div>
+        </div>
+
+        <!-- Row 1: basic params -->
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">程式</label>
+          <select id="blast-type" class="form-select form-select-sm" onchange="updateBlastMatrix()">
+            <option value="auto">自動判斷</option>
+            <option value="protein">blastp（蛋白質）</option>
+            <option value="nucleotide">blastn（核酸 CDS）</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">E-value 閾值</label>
+          <select id="blast-evalue" class="form-select form-select-sm">
+            <option value="1e-5">1×10⁻⁵（預設）</option>
+            <option value="1e-3">1×10⁻³</option>
+            <option value="1e-10">1×10⁻¹⁰</option>
+            <option value="1e-20">1×10⁻²⁰</option>
+            <option value="1e-50">1×10⁻⁵⁰</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">每個物種最多結果</label>
+          <select id="blast-maxhits" class="form-select form-select-sm">
+            <option value="5">5 筆 / 物種</option>
+            <option value="10" selected>10 筆 / 物種</option>
+            <option value="20">20 筆 / 物種</option>
+            <option value="50">50 筆 / 物種</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2 align-items-end">
+          <button class="btn btn-sm btn-primary flex-grow-1" onclick="runBlast()">
+            ▶ BLAST 搜尋
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="clearBlast()" title="清除">✕</button>
+        </div>
+
+        <!-- Row 2: advanced params -->
+        <div class="col-12">
+          <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:10px;">
+            <span style="font-size:.78rem;font-weight:600;color:var(--text-muted);letter-spacing:.03em;">進階參數</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">
+            Scoring Matrix
+            <span id="blast-matrix-hint" style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(blastp)</span>
+          </label>
+          <select id="blast-matrix" class="form-select form-select-sm">
+            <option value="BLOSUM62" selected>BLOSUM62（預設）</option>
+            <option value="BLOSUM45">BLOSUM45（遠緣）</option>
+            <option value="BLOSUM80">BLOSUM80（近緣）</option>
+            <option value="PAM30">PAM30（高相似）</option>
+            <option value="PAM70">PAM70</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">
+            Word Size
+            <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">（越小越靈敏）</span>
+          </label>
+          <select id="blast-wordsize" class="form-select form-select-sm">
+            <option value="" id="blast-wordsize-default">預設（blastp = 3）</option>
+            <option value="2">2（最靈敏）</option>
+            <option value="3">3</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="11">11</option>
+            <option value="15">15</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">
+            最低 Identity %
+            <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">（過濾結果）</span>
+          </label>
+          <select id="blast-minid" class="form-select form-select-sm" onchange="renderBlastTable()">
+            <option value="0" selected>不限</option>
+            <option value="30">≥ 30%</option>
+            <option value="50">≥ 50%</option>
+            <option value="70">≥ 70%</option>
+            <option value="80">≥ 80%</option>
+            <option value="90">≥ 90%</option>
+            <option value="95">≥ 95%</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-600 mb-1" style="font-size:.82rem;">
+            最低 Q.Cov %
+            <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">（過濾結果）</span>
+          </label>
+          <select id="blast-minqcov" class="form-select form-select-sm" onchange="renderBlastTable()">
+            <option value="0" selected>不限</option>
+            <option value="30">≥ 30%</option>
+            <option value="50">≥ 50%</option>
+            <option value="70">≥ 70%</option>
+            <option value="80">≥ 80%</option>
+            <option value="90">≥ 90%</option>
+          </select>
+        </div>
+      </div>
+      <div id="blast-status" class="mt-2" style="font-size:.82rem;color:var(--text-muted);min-height:1.2em;"></div>
+    </div>
+  </div>
+
+  <!-- Results card (hidden until search completes) -->
+  <div id="blast-results-card" class="card chart-card mb-3" style="display:none;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span id="blast-results-title">Results</span>
+      <div class="d-flex align-items-center gap-2">
+        <input id="blast-filter" class="form-control form-control-sm" style="width:200px;"
+          placeholder="篩選物種或基因ID..." oninput="filterBlastResults()">
+        <button class="btn btn-sm btn-outline-secondary" onclick="downloadBlastTSV()">⬇ TSV</button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.79rem;">
+          <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+            <tr>
+              <th style="width:30px;">#</th>
+              <th onclick="sortBlast('sp_name')" style="cursor:pointer;">物種 ↕</th>
+              <th onclick="sortBlast('gene_id')" style="cursor:pointer;">Gene ID ↕</th>
+              <th onclick="sortBlast('pct_id')" style="cursor:pointer;">Identity% ↕</th>
+              <th onclick="sortBlast('qcov')" style="cursor:pointer;">Q.Cov% ↕</th>
+              <th onclick="sortBlast('align_len')" style="cursor:pointer;">Align.Len ↕</th>
+              <th onclick="sortBlast('evalue')" style="cursor:pointer;">E-value ↕</th>
+              <th onclick="sortBlast('score')" style="cursor:pointer;">Bit Score ↕</th>
+              <th>Query</th>
+              <th>Subject</th>
+            </tr>
+          </thead>
+          <tbody id="blast-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card-footer" style="font-size:.78rem;color:var(--text-muted);" id="blast-footer"></div>
+  </div>
+
+  <!-- Alignment detail (shown on row click) -->
+  <div id="blast-align-card" class="card chart-card mb-3" style="display:none;">
+    <div class="card-header" id="blast-align-title">Alignment Detail</div>
+    <div class="card-body">
+      <pre id="blast-align-pre" style="font-size:.72rem;line-height:1.5;overflow-x:auto;background:var(--bg-alt);padding:.75rem;border-radius:4px;"></pre>
+    </div>
+  </div>
+
+  <!-- Service not available notice -->
+  <div id="blast-unavail" class="alert alert-warning" style="display:none;font-size:.85rem;">
+    ⚠️  BLAST API 服務未啟動。請使用 <code>server.py</code> 啟動（見 START_WEBSITE.sh）。
+  </div>
+
+</div><!-- /fig-container -->
+<footer>Dendrobium Pangenome &nbsp;·&nbsp; BLAST Sequence Search &nbsp;·&nbsp; BLAST+ 2.12.0 &nbsp;·&nbsp; 26 species</footer>
+</div>
+
+<!-- ── Lightbox ───────────────────────────────────────────────────────────── -->
+<div id="lightbox" onclick="closeLightbox()">
+  <span id="lightbox-close" onclick="closeLightbox()">✕</span>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<script>
+// ── Tab switching ────────────────────────────────────────────────────────────
+const TABS = ['pangenome', 'figures', 'browser', 'annotation', 'blast', 'seqserver', 'rnaseq', 'vigs', 'vigs-orig', 'methods'];
+let jbrowseLoaded = false;
+let seqserverLoaded = false;
+let rnaseqLoaded = false;
+let vigsLoaded = false;
+let vigsOrigLoaded = false;
+
+function showTab(name) {
+  event && event.preventDefault();
+  TABS.forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+  // Lazy-load JBrowse2 iframe
+  if (name === 'browser' && !jbrowseLoaded) {
+    document.getElementById('jbrowse-frame').src = 'http://localhost:9000';
+    jbrowseLoaded = true;
+  }
+  // Lazy-load SequenceServer iframe
+  if (name === 'seqserver' && !seqserverLoaded) {
+    document.getElementById('seqserver-frame').src = 'http://localhost:4568';
+    seqserverLoaded = true;
+  }
+  // Lazy-init native RNA-seq tab
+  if (name === 'rnaseq' && !rnaseqLoaded) {
+    initRnaseq();
+    rnaseqLoaded = true;
+  }
+  // Lazy-init VIGS tab
+  if (name === 'vigs' && !vigsLoaded) {
+    initVIGS();
+    vigsLoaded = true;
+  }
+  // Lazy-load original SGN VIGS iframe
+  if (name === 'vigs-orig' && !vigsOrigLoaded) {
+    const frame = document.getElementById('vigs-orig-frame');
+    const status = document.getElementById('vigs-orig-status');
+    frame.src = 'http://localhost:9004';
+    frame.onload = () => status.textContent = '✅ 已載入';
+    frame.onerror = () => status.textContent = '❌ 無法連線（索引建立中或服務未啟動）';
+    vigsOrigLoaded = true;
+  }
+  // Relayout Plotly charts when switching back to pangenome tab
+  if (name === 'pangenome') {
+    ['chart-donut','chart-species-bar','chart-accum',
+     'chart-heatmap','chart-pca','chart-dup'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el._fullData) Plotly.relayout(id, {});
+    });
+  }
+  // Lazy-init annotation tab
+  if (name === 'annotation') {
+    initAnnotation();
+  }
+  // Lazy-init figures tab interactive charts
+  if (name === 'figures') {
+    initFigures();
+    ['chart-ortho-heatmap','chart-ks-heatmap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el._fullData) Plotly.relayout(id, {});
+    });
+  }
+}
+
+// ── Lightbox ─────────────────────────────────────────────────────────────────
+function openLightbox(img) {
+  document.getElementById('lightbox-img').src = img.src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PANGENOME CHARTS  (from data.js)
+// ════════════════════════════════════════════════════════════════════════════
+const D = PANGENOME_DATA;
+const COLORS = {
+  Core: '#00A087', Softcore: '#3C5488', Dispensable: '#F39B7F', Private: '#E64B35',
+};
+const LAYOUT_BASE = {
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+  font: { family: 'Source Sans 3, Helvetica Neue, Arial, sans-serif', size: 13, color: '#1A1A1A' },
+  margin: { t: 30, r: 20, b: 60, l: 60 },
+};
+const CONFIG = { responsive: true, displayModeBar: false };
+
+// Stat Cards
+(function() {
+  const o = D.overall;
+  const items = [
+    { label: 'Species',          value: o.n_species.toLocaleString(),    color: '#2566a8', icon: '🌿' },
+    { label: 'Total Genes',      value: o.n_genes.toLocaleString(),       color: '#1f77b4', icon: '🧬' },
+    { label: 'Orthogroups',      value: o.n_orthogroups.toLocaleString(), color: '#6c3d91', icon: '🔗' },
+  ];
+  document.getElementById('stat-cards').innerHTML = items.map(({label, value, color, icon}) => `
+    <div class="col-6 col-sm-4 col-lg-2">
+      <div class="card stat-card text-center py-3 px-2">
+        <div style="font-size:1.7rem">${icon}</div>
+        <div class="stat-value" style="color:${color}">${value}</div>
+        <div class="stat-label">${label}</div>
+      </div>
+    </div>`).join('');
+})();
+
+// Donut
+Plotly.newPlot('chart-donut', [{
+  type: 'pie', labels: D.classification.labels, values: D.classification.values,
+  hole: 0.5, marker: { colors: D.classification.labels.map(l => COLORS[l]) },
+  textinfo: 'label+percent',
+  hovertemplate: '<b>%{label}</b><br>%{value:,} orthogroups<br>%{percent}<extra></extra>',
+}], {
+  ...LAYOUT_BASE, showlegend: true, legend: { orientation: 'h', y: -0.15 },
+  margin: { t: 20, r: 20, b: 40, l: 20 },
+  annotations: [{ text: D.overall.n_orthogroups.toLocaleString() + '<br>OGs',
+    x: 0.5, y: 0.5, showarrow: false, font: { size: 15, color: '#2d3436' } }],
+}, CONFIG);
+
+// Class bar
+// Species bar
+// NPG (Nature Publishing Group) colour palette — ggsci npg
+const SP_COLORS = [
+  '#E64B35','#4DBBD5','#00A087','#3C5488','#F39B7F',
+  '#8491B4','#91D1C2','#DC0000','#7E6148','#B09C85',
+  '#AE482A','#1B79B2','#198063','#2A3E6C','#C97B63',
+  '#6B75A0','#74B0A3','#AE0000','#5E4A34','#8A7868',
+  '#D4785A','#3A92C4','#2DA87D','#4A5E8E','#E0A07A',
+  '#9EAACB',
+];
+// Map display name → species color (built from per_species order)
+const SP_COLOR_MAP = {};
+D.per_species.display.forEach((name, i) => { SP_COLOR_MAP[name] = SP_COLORS[i % SP_COLORS.length]; });
+
+// Scientific name helpers — wrap in <i> for display, strip for lookups
+const isp = n => '<i>' + n + '</i>';
+const stripI = s => (typeof s === 'string') ? s.replace(/<[^>]*>/g, '') : s;
+
+const SP_METRIC_DESC = {
+  n_genes:          '各物種基因組中預測的蛋白質編碼基因總數（包含未能歸入任何 Orthogroup 的基因）。',
+  n_in_orthogroups: '成功歸入 Orthogroup（與其他物種有同源關係）的基因數量。比例越高代表該物種基因組與其他物種越相似。',
+  n_unassigned:     '未能歸入任何 Orthogroup 的基因數量，即物種私有或序列差異過大的基因。',
+  n_orthogroups:    '該物種至少含有一個基因的 Orthogroup 總數，反映該物種基因功能的多樣性。',
+  n_species_specific: '僅在該物種中出現、其他 25 個物種皆不含有的 Orthogroup 數量（私有基因群），代表物種特有的基因創新。',
+};
+function buildSpeciesBar(metric) {
+  const ps = D.per_species, vals = ps[metric];
+  const idx = vals.map((_,i)=>i).sort((a,b)=>vals[b]-vals[a]);
+  Plotly.react('chart-species-bar', [{
+    type: 'bar',
+    x: idx.map(i => isp(ps.display[i])),
+    y: idx.map(i => vals[i]),
+    marker: { color: idx.map(i => SP_COLORS[i % SP_COLORS.length]) },
+    hovertemplate: '<b>%{x}</b>: %{y:,}<extra></extra>',
+  }], { ...LAYOUT_BASE, xaxis: { tickangle: -40 },
+    yaxis: { title: 'Count', gridcolor: '#e9ecef' },
+    margin: { t: 20, r: 20, b: 100, l: 80 } }, CONFIG);
+  document.getElementById('sp-metric-desc').textContent = SP_METRIC_DESC[metric] || '';
+}
+buildSpeciesBar('n_genes');
+document.getElementById('sp-metric').addEventListener('change', e => buildSpeciesBar(e.target.value));
+document.getElementById('chart-species-bar').on('plotly_click', function(data) {
+  const displayName = stripI(data.points[0].x);
+  const ps = D.per_species;
+  const i = ps.display.indexOf(displayName);
+  if (i < 0) return;
+  const spId = ps.species[i];
+  showTab('annotation');
+  // wait for annotation tab to init, then select species and load table
+  setTimeout(function() {
+    const sel = document.getElementById('sp-table-select');
+    sel.value = spId;
+    loadSpeciesTable();
+    document.getElementById('sp-table-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+});
+
+// Accumulation
+(function() {
+  const a = D.accumulation;
+  Plotly.newPlot('chart-accum', [
+    { x:a.x, y:a.pan_upper, showlegend:false, type:'scatter', mode:'lines', line:{width:0}, fill:'none', hoverinfo:'skip' },
+    { x:a.x, y:a.pan_lower, name:'Pangenome ±SD', type:'scatter', mode:'lines', fill:'tonexty', fillcolor:'rgba(255,127,14,0.2)', line:{width:0}, showlegend:false, hoverinfo:'skip' },
+    { x:a.x, y:a.pan_mean, name:'Pangenome', type:'scatter', mode:'lines+markers', line:{color:'#ff7f0e',width:2.5}, marker:{size:5}, hovertemplate:'N=%{x}<br>Pan: %{y:.0f}<extra></extra>' },
+    { x:a.x, y:a.core_upper, showlegend:false, type:'scatter', mode:'lines', line:{width:0}, fill:'none', hoverinfo:'skip' },
+    { x:a.x, y:a.core_lower, name:'Core ±SD', type:'scatter', mode:'lines', fill:'tonexty', fillcolor:'rgba(44,160,44,0.2)', line:{width:0}, showlegend:false, hoverinfo:'skip' },
+    { x:a.x, y:a.core_mean, name:'Core Genome', type:'scatter', mode:'lines+markers', line:{color:'#2ca02c',width:2.5}, marker:{size:5}, hovertemplate:'N=%{x}<br>Core: %{y:.0f}<extra></extra>' },
+  ], { ...LAYOUT_BASE, xaxis:{title:'Number of Species',dtick:2,gridcolor:'#e9ecef'}, yaxis:{title:'Orthogroups',gridcolor:'#e9ecef'}, legend:{x:.7,y:.9} }, CONFIG);
+})();
+
+// Heatmap
+(function() {
+  const ov = D.overlap;
+  Plotly.newPlot('chart-heatmap', [{
+    type:'heatmap', z:ov.matrix, x:ov.display.map(isp), y:ov.display.map(isp),
+    colorscale:'YlGn', hovertemplate:'<b>%{y}</b> ∩ <b>%{x}</b><br>%{z:,} OGs<extra></extra>',
+    colorbar:{title:'Shared OGs',thickness:15},
+  }], { ...LAYOUT_BASE, xaxis:{tickangle:-45,tickfont:{size:9}}, yaxis:{tickfont:{size:9},autorange:'reversed'}, margin:{t:20,r:60,b:130,l:130} }, CONFIG);
+})();
+
+// PCA
+(function() {
+  const p = D.pca;
+  Plotly.newPlot('chart-pca', [{
+    type:'scatter', mode:'markers+text', x:p.pc1, y:p.pc2, text:p.display.map(isp),
+    textposition:'top center', textfont:{size:9},
+    marker:{size:10,color:'#2566a8',opacity:.85,line:{width:1,color:'white'}},
+    hovertemplate:'<b>%{text}</b><br>PC1:%{x:.3f}<br>PC2:%{y:.3f}<extra></extra>',
+  }], { ...LAYOUT_BASE, xaxis:{title:`PC1 (${p.var_explained[0]}%)`,gridcolor:'#e9ecef',zeroline:true}, yaxis:{title:`PC2 (${p.var_explained[1]}%)`,gridcolor:'#e9ecef',zeroline:true}, margin:{t:30,r:40,b:60,l:70} }, CONFIG);
+})();
+
+// Duplications
+(function() {
+  const d = D.duplications;
+  Plotly.newPlot('chart-dup', [{
+    type:'bar', orientation:'h', y:d.display.map(isp), x:d.counts,
+    marker:{color:'#c0392b',opacity:.8},
+    hovertemplate:'<b>%{y}</b>: %{x:,}<extra></extra>',
+  }], { ...LAYOUT_BASE, xaxis:{title:'Duplication Events',gridcolor:'#e9ecef'}, yaxis:{tickfont:{size:11},autorange:true}, margin:{t:20,r:40,b:60,l:150} }, CONFIG);
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TAB 2 — ANALYSIS FIGURES (interactive, lazy-initialized)
+// ════════════════════════════════════════════════════════════════════════════
+const KS = KS_DATA;
+let figuresInitialized = false;
+
+function initFigures() {
+  if (figuresInitialized) return;
+  figuresInitialized = true;
+  buildOrthoHeatmap();
+  buildKsHeatmap();
+  initDotpicker();
+}
+
+// ── Ortholog Heatmap ──────────────────────────────────────────────────────
+function buildOrthoHeatmap() {
+  const ov = D.overlap;
+  Plotly.newPlot('chart-ortho-heatmap', [{
+    type: 'heatmap', z: ov.matrix, x: ov.display.map(isp), y: ov.display.map(isp),
+    colorscale: 'Blues', reversescale: true,
+    hovertemplate: '<b>%{y}</b> ∩ <b>%{x}</b><br>%{z:,} shared OGs<extra></extra>',
+    colorbar: { title: 'Shared OGs', thickness: 15 },
+  }], {
+    ...LAYOUT_BASE,
+    xaxis: { tickangle: -45, tickfont: { size: 9 } },
+    yaxis: { tickfont: { size: 9 }, autorange: 'reversed' },
+    margin: { t: 20, r: 60, b: 130, l: 130 },
+  }, CONFIG);
+
+  document.getElementById('chart-ortho-heatmap').on('plotly_click', function(data) {
+    const pt = data.points[0];
+    const xi = pt.x, yi = pt.y, shared = pt.z;
+    const xi_idx = ov.display.indexOf(stripI(xi));
+    const yi_idx = ov.display.indexOf(stripI(yi));
+    if (xi_idx === -1 || yi_idx === -1 || xi_idx === yi_idx) return;
+    const totalA = D.per_species.n_orthogroups[xi_idx];
+    const totalB = D.per_species.n_orthogroups[yi_idx];
+    const uniqueA = totalA - shared, uniqueB = totalB - shared;
+    document.getElementById('ortho-detail-title').innerHTML = xi + ' ∩ ' + yi;
+    Plotly.newPlot('chart-ortho-detail', [{
+      type: 'bar',
+      x: ['Shared', stripI(xi) + ' 特有', stripI(yi) + ' 特有'],
+      y: [shared, uniqueA, uniqueB],
+      marker: { color: ['#2ca02c', '#1f77b4', '#ff7f0e'] },
+      text: [shared.toLocaleString(), uniqueA.toLocaleString(), uniqueB.toLocaleString()],
+      textposition: 'outside',
+      hovertemplate: '%{x}: %{y:,}<extra></extra>',
+    }], {
+      ...LAYOUT_BASE,
+      yaxis: { title: 'Orthogroups', gridcolor: '#e9ecef' },
+      margin: { t: 20, r: 20, b: 80, l: 70 },
+    }, CONFIG);
+    const pA = (shared / totalA * 100).toFixed(1);
+    const pB = (shared / totalB * 100).toFixed(1);
+    document.getElementById('ortho-detail-text').innerHTML =
+      '<b>' + xi + '</b> 共 ' + totalA.toLocaleString() + ' OGs，' + pA + '% 與 <b>' + yi + '</b> 共有。<br>' +
+      '<b>' + yi + '</b> 共 ' + totalB.toLocaleString() + ' OGs，' + pB + '% 與 <b>' + xi + '</b> 共有。<br>' +
+      '共同 OGs：<b>' + shared.toLocaleString() + '</b>';
+  });
+}
+
+// ── Ks Heatmap ────────────────────────────────────────────────────────────
+function buildKsHeatmap() {
+  const z = KS.medians.map((row, i) => row.map((v, j) => i === j ? null : v));
+  Plotly.newPlot('chart-ks-heatmap', [{
+    type: 'heatmap', z: z, x: KS.display.map(isp), y: KS.display.map(isp),
+    colorscale: 'RdYlGn_r', zauto: false, zmin: 0, zmax: 2,
+    hovertemplate: '<b>%{y}</b> vs <b>%{x}</b><br>Ks median: %{z:.3f}<extra></extra>',
+    colorbar: { title: 'Median Ks', thickness: 15 },
+  }], {
+    ...LAYOUT_BASE,
+    xaxis: { tickangle: -45, tickfont: { size: 9 } },
+    yaxis: { tickfont: { size: 9 }, autorange: 'reversed' },
+    margin: { t: 20, r: 60, b: 130, l: 130 },
+  }, CONFIG);
+
+  document.getElementById('chart-ks-heatmap').on('plotly_click', function(data) {
+    const pt = data.points[0];
+    const xi = pt.x, yi = pt.y;
+    const xi_idx = KS.display.indexOf(stripI(xi));
+    const yi_idx = KS.display.indexOf(stripI(yi));
+    if (xi_idx === -1 || yi_idx === -1 || xi_idx === yi_idx) return;
+    const sp1 = KS.assemblies[xi_idx], sp2 = KS.assemblies[yi_idx];
+    const key = Object.keys(KS.distributions).find(k => {
+      const [a, b] = k.split(':');
+      return (a === sp1 && b === sp2) || (a === sp2 && b === sp1);
+    });
+    document.getElementById('ks-detail-title').innerHTML = yi + ' vs ' + xi + ' — Ks 分佈';
+    if (!key) {
+      document.getElementById('ks-detail-text').textContent = '此物種對無 Ks 資料';
+      return;
+    }
+    const dist = KS.distributions[key];
+    const ymax = Math.max(...dist.counts);
+    Plotly.newPlot('chart-ks-dist', [
+      {
+        type: 'bar', x: dist.bins, y: dist.counts, name: 'Count',
+        marker: { color: '#2566a8', opacity: 0.8 },
+        hovertemplate: 'Ks %{x:.2f}: %{y} pairs<extra></extra>',
+      },
+      {
+        type: 'scatter', mode: 'lines', name: 'median ' + dist.median.toFixed(3),
+        x: [dist.median, dist.median], y: [0, ymax],
+        line: { color: '#c0392b', width: 2, dash: 'dash' },
+        hovertemplate: 'Median Ks: %{x:.3f}<extra></extra>',
+      },
+    ], {
+      ...LAYOUT_BASE,
+      xaxis: { title: 'Ks', gridcolor: '#e9ecef' },
+      yaxis: { title: 'Gene pairs', gridcolor: '#e9ecef' },
+      legend: { x: 0.6, y: 0.95, bgcolor: 'rgba(255,255,255,0.7)' },
+      margin: { t: 20, r: 20, b: 60, l: 70 },
+    }, CONFIG);
+    document.getElementById('ks-detail-text').innerHTML =
+      'n = <b>' + dist.n + '</b> 基因對 · 中位數 Ks = <b>' + dist.median.toFixed(4) + '</b>';
+  });
+}
+
+// ── Dotplot Picker ────────────────────────────────────────────────────────
+const DISP_MAP = {};
+KS.assemblies.forEach((a, i) => { DISP_MAP[a] = KS.display[i]; });
+
+function initDotpicker() {
+  const sel1 = document.getElementById('dot-sp1');
+  const sel2 = document.getElementById('dot-sp2');
+  KS.assemblies.forEach((a, i) => {
+    sel1.add(new Option(KS.display[i], a));
+    sel2.add(new Option(KS.display[i], a));
+  });
+  sel1.value = 'Dnobile';
+  sel2.value = 'Dhuoshanense';
+}
+
+function loadDotplot() {
+  const sp1 = document.getElementById('dot-sp1').value;
+  const sp2 = document.getElementById('dot-sp2').value;
+  if (sp1 === sp2) { alert('請選擇不同的兩個物種'); return; }
+  const wrap = document.getElementById('dotplot-wrap');
+  document.getElementById('dotplot-title').innerHTML = isp(DISP_MAP[sp1]) + ' vs ' + isp(DISP_MAP[sp2]);
+  const u1 = 'img/dotplots/' + sp1 + '.' + sp2 + '.png';
+  const u2 = 'img/dotplots/' + sp2 + '.' + sp1 + '.png';
+  wrap.innerHTML = '<img src="' + u1 + '" alt="dotplot" style="max-width:100%;border-radius:4px;"' +
+    ' onerror="this.src=\'' + u2 + '\';this.onerror=function(){this.parentNode.innerHTML=\'<span style=color:#aaa>圖片未找到</span>\'}">';
+}
+
+function loadDotplotOverview() {
+  const wrap = document.getElementById('dotplot-wrap');
+  document.getElementById('dotplot-title').innerHTML = '<i>D. nobile</i> × 25 物種總覽';
+  wrap.innerHTML = '<img src="img/dotplots/Dnobile_vs_all_dotplots.png" alt="overview"' +
+    ' style="max-width:100%;border-radius:4px;"' +
+    ' onerror="this.parentNode.innerHTML=\'<span style=color:#aaa>總覽圖未找到</span>\'">';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TAB 4 — FUNCTIONAL ANNOTATION
+// ════════════════════════════════════════════════════════════════════════════
+let annotInitialized = false;
+
+function initAnnotation() {
+  if (annotInitialized) return;
+  annotInitialized = true;
+  const E = EGGNOG_DATA;
+
+  // ── Annotation Stats Bar ──────────────────────────────────────────────
+  function buildAnnotBar(metric) {
+    const st = E.annot_stats;
+    const vals = st[metric];
+    const idx = vals.map((_,i)=>i).sort((a,b)=>vals[b]-vals[a]);
+    const LABELS = {
+      n_annotated: '注釋基因數', n_go: '有 GO terms', n_kegg_ko: '有 KEGG KO',
+      n_kegg_pathway: '有 KEGG Pathway', n_cog: '有 COG 分類',
+    };
+    Plotly.react('chart-annot-bar', [{
+      type: 'bar',
+      x: idx.map(i => isp(st.display[i])),
+      y: idx.map(i => vals[i]),
+      marker: { color: idx.map(i => SP_COLOR_MAP[st.display[i]] || SP_COLORS[i % SP_COLORS.length]), opacity: 0.85 },
+      hovertemplate: '<b>%{x}</b>: %{y:,}<extra></extra>',
+    }], {
+      ...LAYOUT_BASE,
+      xaxis: { tickangle: -40 },
+      yaxis: { title: LABELS[metric], gridcolor: '#e9ecef' },
+      margin: { t: 20, r: 20, b: 110, l: 80 },
+    }, CONFIG);
+  }
+  buildAnnotBar('n_annotated');
+  document.getElementById('annot-metric').addEventListener('change', e => buildAnnotBar(e.target.value));
+
+  // ── COG Heatmap ───────────────────────────────────────────────────────
+  const cog = E.cog;
+  // Filter out S (Unknown function) by default
+  const COG_HIDE = new Set(['S']);
+  const cogVisIdx = cog.categories.map((c,i) => i).filter(i => !COG_HIDE.has(cog.categories[i]));
+  const cogLabels = cogVisIdx.map(i => cog.labels[i]);
+  const cogMatrix = cog.matrix.map(row => cogVisIdx.map(i => row[i]));
+
+  Plotly.newPlot('chart-cog-heatmap', [{
+    type: 'heatmap',
+    z: cogMatrix,
+    x: cogLabels,
+    y: cog.species.map(isp),
+    colorscale: 'Reds',
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>%{z:,} genes<extra></extra>',
+    colorbar: { title: 'Genes', thickness: 15 },
+  }], {
+    ...LAYOUT_BASE,
+    xaxis: { tickangle: -35, tickfont: { size: 9 } },
+    yaxis: { tickfont: { size: 9 }, autorange: 'reversed' },
+    margin: { t: 20, r: 60, b: 150, l: 140 },
+  }, CONFIG);
+
+  document.getElementById('chart-cog-heatmap').on('plotly_click', function(data) {
+    const pt = data.points[0];
+    const sp_idx = cog.species.indexOf(stripI(pt.y));
+    if (sp_idx === -1) return;
+    document.getElementById('cog-detail-title').innerHTML = pt.y + ' — COG 分佈';
+    const row = cog.matrix[sp_idx];
+    const visRow = cogVisIdx.map(i => row[i]);
+    const sorted_idx = visRow.map((_,i)=>i).sort((a,b)=>visRow[b]-visRow[a]);
+    Plotly.newPlot('chart-cog-detail', [{
+      type: 'bar', orientation: 'h',
+      y: sorted_idx.map(i => cogLabels[i] + ' (' + cog.categories[cogVisIdx[i]] + ')'),
+      x: sorted_idx.map(i => visRow[i]),
+      marker: { color: '#e07b39', opacity: 0.85 },
+      hovertemplate: '%{y}: %{x:,}<extra></extra>',
+    }], {
+      ...LAYOUT_BASE,
+      xaxis: { title: 'Genes', gridcolor: '#e9ecef' },
+      yaxis: { tickfont: { size: 9 }, autorange: 'reversed' },
+      margin: { t: 10, r: 20, b: 50, l: 180 },
+    }, CONFIG);
+  });
+
+
+  // Species table picker init
+  const spSel = document.getElementById('sp-table-select');
+  EGGNOG_DATA.annot_stats.species.forEach((id, i) => {
+    spSel.add(new Option(EGGNOG_DATA.annot_stats.display[i], id));
+  });
+
+  // Download links for raw annotation files
+  const SPECIES_MAP_DL = {
+    "Daphylium":"Dendrobium_aphylium","Dbullenianum":"D_bullenianum","Dcariniferum":"D_cariniferum",
+    "Dcatenatum":"D_catenatum","DChaoPraya":"Dendrobium_ChaoPrayaSmile","Dchrysotoxum":"D_chrysotoxum",
+    "Dcrocatum":"Dendrobium_crocatum","Dcrumenatum":"Dendrobium_crumenatum","Ddevonianum":"Dendrobium_devonianum",
+    "Ddiscolor":"Dendrobium_discolor","Dellipsophyllum":"Dendrobium_ellipsophyllum","Dexile":"D_exile",
+    "Dformosum":"Dendrobium_formosum","Dhercoglossum":"Dendrobium_hercoglossum","Dhuoshanense":"D_huoshanense",
+    "Djenkinsii":"Dendrobium_jenkinsii","Dleonis":"Dendrobium_leonis","Dlindleyi":"Dendrobium_lindleyi",
+    "Dnobile":"D_nobile","Dparcum":"D_parcum","Dporphyrochilum":"D_porphyrochilum",
+    "Dsecundum":"D_secundum","Dsmilliae":"Dendrobium_smilliae","Dspatella":"D_spatella",
+    "Dtetragonum":"Dendrobium_tetragonum","Dthyrsiflorum":"D_thyrsiflorum"
+  };
+  const dlWrap = document.getElementById('download-links');
+  EGGNOG_DATA.annot_stats.species.forEach((id, i) => {
+    const stem = SPECIES_MAP_DL[id] || id;
+    const fname = stem + '.emapper.annotations';
+    const a = document.createElement('a');
+    a.href = 'data/eggnog/' + fname;
+    a.download = fname;
+    a.innerHTML = '<i>' + EGGNOG_DATA.annot_stats.display[i] + '</i>';
+    a.style.cssText = 'display:inline-block;padding:4px 10px;background:var(--bg-alt);border:1px solid var(--border);border-radius:4px;font-size:.78rem;color:var(--npg-navy);text-decoration:none;';
+    a.onmouseover = () => a.style.background = '#e8f0fb';
+    a.onmouseout  = () => a.style.background = 'var(--bg-alt)';
+    dlWrap.appendChild(a);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SPECIES ANNOTATION TABLE
+// ════════════════════════════════════════════════════════════════════════════
+let tableAllRows  = [];
+let tableFiltered = [];
+let curPage = 0, totalPages = 1, pageSize = 50;
+let sortCol = -1, sortAsc = true;
+
+const COG_FULL_JS = {
+  A:"RNA processing",B:"Chromatin structure",C:"Energy metabolism",
+  D:"Cell cycle/division",E:"Amino acid metabolism",F:"Nucleotide metabolism",
+  G:"Carbohydrate metabolism",H:"Coenzyme metabolism",I:"Lipid metabolism",
+  J:"Translation/ribosome",K:"Transcription",L:"DNA replication/repair",
+  M:"Cell wall/membrane",N:"Cell motility",O:"Protein modification",
+  P:"Ion transport/metabolism",Q:"Secondary metabolism",R:"General function",
+  S:"Unknown function",T:"Signal transduction",U:"Vesicular transport",
+  V:"Defense",W:"Extracellular",Z:"Cytoskeleton",
+};
+
+function loadSpeciesTable() {
+  const sp = document.getElementById('sp-table-select').value;
+  if (!sp) return;
+  const idx = EGGNOG_DATA.annot_stats.species.indexOf(sp);
+  const dispName = idx >= 0 ? EGGNOG_DATA.annot_stats.display[idx] : sp;
+
+  document.getElementById('sp-table-card').style.display = 'none';
+  document.getElementById('sp-table-loading').style.display = 'block';
+  document.getElementById('table-count').textContent = '';
+
+  fetch('data/species_tables/' + sp + '.json')
+    .then(r => r.json())
+    .then(data => {
+      tableAllRows = data.rows;
+      sortCol = -1;
+      const cogSet = new Set();
+      data.rows.forEach(r => { if (r[2]) r[2].split('').forEach(c => cogSet.add(c)); });
+      const cf = document.getElementById('cog-filter');
+      cf.innerHTML = '<option value="">All COG categories</option>';
+      [...cogSet].sort().forEach(c => cf.add(new Option(c + ' — ' + (COG_FULL_JS[c]||c), c)));
+      document.getElementById('table-search').value = '';
+      document.getElementById('sp-table-title').textContent =
+        dispName + ' — ' + tableAllRows.length.toLocaleString() + ' annotated genes';
+      document.getElementById('sp-table-loading').style.display = 'none';
+      document.getElementById('sp-table-card').style.display = '';
+      document.getElementById('btn-download-tsv').style.display = '';
+      document.querySelectorAll('#sp-table th').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+      filterTable();
+    })
+    .catch(() => {
+      document.getElementById('sp-table-loading').style.display = 'none';
+      alert('Failed to load annotation data.');
+    });
+}
+
+function filterTable() {
+  const q = document.getElementById('table-search').value.toLowerCase();
+  const cog = document.getElementById('cog-filter').value;
+  tableFiltered = tableAllRows.filter(r => {
+    if (cog && !(r[2] && r[2].includes(cog))) return false;
+    if (q) {
+      const hay = (r[0]+' '+r[1]+' '+r[3]+' '+r[5]+' '+r[7]).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  pageSize = parseInt(document.getElementById('pg-size').value) || 50;
+  totalPages = Math.max(1, Math.ceil(tableFiltered.length / pageSize));
+  curPage = 0;
+  document.getElementById('table-count').textContent =
+    tableFiltered.length.toLocaleString() + ' / ' + tableAllRows.length.toLocaleString() + ' genes';
+  renderPage();
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  document.querySelectorAll('#sp-table th').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+  const th = document.querySelector('#sp-table th[data-col="' + col + '"]');
+  if (th) th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+  tableFiltered.sort((a, b) => {
+    const av = a[col] ?? '', bv = b[col] ?? '';
+    if (typeof av === 'number') return sortAsc ? av - bv : bv - av;
+    return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+  curPage = 0; renderPage();
+}
+
+function renderGoBadges(goStr) {
+  if (!goStr) return '<span style="color:#aaa">—</span>';
+  const ids = goStr.split(',');
+  const SHOW = 4;
+  const visible = ids.slice(0, SHOW).map(g =>
+    '<a href="https://www.ebi.ac.uk/QuickGO/term/'+g.trim()+'" target="_blank" class="go-badge">'+g.trim()+'</a>'
+  ).join(' ');
+  if (ids.length <= SHOW) return visible;
+  const uid = 'go_' + Math.random().toString(36).slice(2);
+  const all = ids.map(g =>
+    '<a href="https://www.ebi.ac.uk/QuickGO/term/'+g.trim()+'" target="_blank" class="go-badge">'+g.trim()+'</a>'
+  ).join(' ');
+  return visible +
+    ' <span id="'+uid+'_more" style="display:inline"><a href="#" style="font-size:.7rem;color:#888" onclick="event.preventDefault();document.getElementById(\''+uid+'_more\').style.display=\'none\';document.getElementById(\''+uid+'_all\').style.display=\'inline\'">+' + (ids.length - SHOW) + ' more</a></span>' +
+    '<span id="'+uid+'_all" style="display:none"> ' + ids.slice(SHOW).map(g =>
+      '<a href="https://www.ebi.ac.uk/QuickGO/term/'+g.trim()+'" target="_blank" class="go-badge">'+g.trim()+'</a>'
+    ).join(' ') + '</span>';
+}
+
+function renderPage() {
+  const start = curPage * pageSize;
+  const slice = tableFiltered.slice(start, start + pageSize);
+  document.getElementById('sp-table-body').innerHTML = slice.map(r => {
+    const cogs = r[2] ? r[2].split('').map(c =>
+      '<span class="cog-badge" title="'+( COG_FULL_JS[c]||c)+'">'+c+'</span>').join(' ')
+      : '<span style="color:#aaa">—</span>';
+    const pw = r[6]
+      ? '<a href="https://www.kegg.jp/pathway/'+r[6]+'" target="_blank" style="font-size:.72rem;color:var(--npg-navy)">'+esc(r[6])+'</a>'
+      : '—';
+    return '<tr>' +
+      '<td><span class="gene-id">' + esc(r[0]) + '</span></td>' +
+      '<td>' + (r[1] ? '<b>'+esc(r[1])+'</b>' : '<span style="color:#aaa">—</span>') + '</td>' +
+      '<td>' + cogs + '</td>' +
+      '<td title="' + esc(r[3]) + '" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r[3]?esc(r[3]):'<span style="color:#aaa">—</span>') + '</td>' +
+      '<td style="max-width:220px;">' + renderGoBadges(r[4]) + '</td>' +
+      '<td style="font-size:.72rem;font-family:monospace">' + (r[5]?esc(r[5]):'—') + '</td>' +
+      '<td>' + pw + '</td>' +
+      '<td style="font-size:.72rem;font-family:monospace">' + (r[7]?esc(r[7]):'—') + '</td>' +
+      '<td style="font-size:.72rem;font-family:monospace">' + (r[8]?esc(r[8]):'—') + '</td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('pg-info').textContent =
+    'Page ' + (curPage+1) + ' of ' + totalPages +
+    ' (' + (start+1) + '–' + Math.min(start+pageSize, tableFiltered.length) + ')';
+  document.getElementById('pg-first').disabled = curPage === 0;
+  document.getElementById('pg-prev').disabled  = curPage === 0;
+  document.getElementById('pg-next').disabled  = curPage >= totalPages-1;
+  document.getElementById('pg-last').disabled  = curPage >= totalPages-1;
+}
+
+function goPage(p) {
+  curPage = Math.max(0, Math.min(p, totalPages-1));
+  renderPage();
+  document.getElementById('sp-table-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function changePageSize() {
+  pageSize = parseInt(document.getElementById('pg-size').value)||50;
+  totalPages = Math.max(1, Math.ceil(tableFiltered.length/pageSize));
+  curPage = 0; renderPage();
+}
+
+function downloadTSV() {
+  const sp = document.getElementById('sp-table-select').value;
+  const headers = ['Gene ID','Preferred Name','COG','Description','GO Terms','KEGG KO','KEGG Pathway','Pfam','EC'];
+  const rows = [headers.join('\t')];
+  tableFiltered.forEach(r => {
+    rows.push(r.map((v,i) => v == null ? '' : String(v)).join('\t'));
+  });
+  const blob = new Blob([rows.join('\n')], {type: 'text/tab-separated-values'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = sp + '_annotation.tsv';
+  a.click();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TAB 6 — BLAST
+// ════════════════════════════════════════════════════════════════════════════
+const BLAST_API = '';
+let blastAllHits = [];
+let blastSortCol = 'evalue';
+let blastSortAsc = true;
+
+// Species for BLAST (id → display name), ordered alphabetically by display
+const BLAST_SPECIES = [
+  ['DChaoPraya',     'D. ChaoPraya Smile'],
+  ['Daphylium',      'D. aphylium'],
+  ['Dbullenianum',   'D. bullenianum'],
+  ['Dcariniferum',   'D. cariniferum'],
+  ['Dcatenatum',     'D. catenatum'],
+  ['Dchrysotoxum',   'D. chrysotoxum'],
+  ['Dcrocatum',      'D. crocatum'],
+  ['Dcrumenatum',    'D. crumenatum'],
+  ['Ddevonianum',    'D. devonianum'],
+  ['Ddiscolor',      'D. discolor'],
+  ['Dellipsophyllum','D. ellipsophyllum'],
+  ['Dexile',         'D. exile'],
+  ['Dformosum',      'D. formosum'],
+  ['Dhercoglossum',  'D. hercoglossum'],
+  ['Dhuoshanense',   'D. huoshanense'],
+  ['Djenkinsii',     'D. jenkinsii'],
+  ['Dleonis',        'D. leonis'],
+  ['Dlindleyi',      'D. lindleyi'],
+  ['Dnobile',        'D. nobile'],
+  ['Dparcum',        'D. parcum'],
+  ['Dporphyrochilum','D. porphyrochilum'],
+  ['Dsecundum',      'D. secundum'],
+  ['Dsmilliae',      'D. smilliae'],
+  ['Dspatella',      'D. spatella'],
+  ['Dtetragonum',    'D. tetragonum'],
+  ['Dthyrsiflorum',  'D. thyrsiflorum'],
+];
+
+// Build species checkbox grid
+(function initBlastSpecies() {
+  const grid = document.getElementById('blast-sp-grid');
+  if (!grid) return;
+  BLAST_SPECIES.forEach(([id, name]) => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:.78rem;cursor:pointer;white-space:nowrap;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true; cb.value = id;
+    cb.className = 'blast-sp-cb';
+    cb.addEventListener('change', updateBlastSpBadge);
+    const span = document.createElement('span');
+    span.innerHTML = '<i>' + name + '</i>';
+    label.appendChild(cb); label.appendChild(span);
+    grid.appendChild(label);
+  });
+})();
+
+function getSelectedSpecies() {
+  return [...document.querySelectorAll('.blast-sp-cb:checked')].map(cb => cb.value);
+}
+function updateBlastSpBadge() {
+  const sel = getSelectedSpecies();
+  const badge = document.getElementById('blast-sp-badge');
+  badge.textContent = sel.length === BLAST_SPECIES.length ? '全部 26 個' : `已選 ${sel.length} 個`;
+  badge.style.background = sel.length === BLAST_SPECIES.length ? 'var(--npg-navy)' : '#e07b39';
+}
+function blastSelectAll()  { document.querySelectorAll('.blast-sp-cb').forEach(cb => cb.checked = true);  updateBlastSpBadge(); }
+function updateBlastMatrix() {
+  const t = document.getElementById('blast-type').value;
+  const hint = document.getElementById('blast-matrix-hint');
+  const matrix = document.getElementById('blast-matrix');
+  const wsDefault = document.getElementById('blast-wordsize-default');
+  if (t === 'nucleotide') {
+    hint.textContent = '(blastn 不適用)';
+    matrix.disabled = true;
+    wsDefault.textContent = '預設（blastn = 11）';
+  } else {
+    hint.textContent = '(blastp)';
+    matrix.disabled = false;
+    wsDefault.textContent = '預設（blastp = 3）';
+  }
+}
+function blastSelectNone() { document.querySelectorAll('.blast-sp-cb').forEach(cb => cb.checked = false); updateBlastSpBadge(); }
+
+function setBlastStatus(msg, color) {
+  const el = document.getElementById('blast-status');
+  el.style.color = color || 'var(--text-muted)';
+  el.textContent = msg;
+}
+
+async function runBlast() {
+  const query    = document.getElementById('blast-query').value.trim();
+  const type     = document.getElementById('blast-type').value;
+  const evalue   = document.getElementById('blast-evalue').value;
+  const maxHits  = document.getElementById('blast-maxhits').value;
+  const species  = getSelectedSpecies();
+  const matrix   = document.getElementById('blast-matrix').value;
+  const wordsize = document.getElementById('blast-wordsize').value;
+
+  if (!query) { setBlastStatus('請輸入序列', '#c0392b'); return; }
+  if (species.length === 0) { setBlastStatus('請至少選擇一個物種', '#c0392b'); return; }
+
+  document.getElementById('blast-results-card').style.display = 'none';
+  document.getElementById('blast-align-card').style.display = 'none';
+  document.getElementById('blast-unavail').style.display = 'none';
+  setBlastStatus('⏳ 搜尋中...', '#888');
+
+  let resp;
+  try {
+    resp = await fetch(BLAST_API + '/api/blast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, type, evalue, max_hits: parseInt(maxHits), species,
+        matrix: matrix || undefined,
+        word_size: wordsize ? parseInt(wordsize) : undefined }),
+    });
+  } catch (e) {
+    document.getElementById('blast-unavail').style.display = '';
+    setBlastStatus('無法連線到 BLAST API', '#c0392b');
+    return;
+  }
+
+  let data;
+  try {
+    data = await resp.json();
+  } catch (e) {
+    setBlastStatus('❌ 無法解析回傳資料：' + e.message, '#c0392b');
+    return;
+  }
+  if (!resp.ok) {
+    setBlastStatus('❌ ' + (data.error || 'Unknown error'), '#c0392b');
+    return;
+  }
+
+  try {
+    blastAllHits = data.hits;
+    blastSortCol = 'evalue';
+    blastSortAsc = true;
+
+    const prog = data.program === 'blastp' ? 'blastp（蛋白質）' : 'blastn（CDS 核酸）';
+    const spInfo = data.species_searched < 26 ? `  ·  ${data.species_searched} 個物種` : '  ·  全部 26 個物種';
+    setBlastStatus(
+      `✓  ${prog}${spInfo}  ·  序列長度 ${data.seq_len} aa/nt  ·  找到 ${data.n_hits} 個結果`,
+      '#2ca02c'
+    );
+
+    document.getElementById('blast-results-title').textContent =
+      `搜尋結果  —  ${prog}  (${data.n_hits} hits，${data.species_searched} 個物種)`;
+
+    renderBlastTable();
+    document.getElementById('blast-results-card').style.display = '';
+  } catch (e) {
+    setBlastStatus('❌ 顯示結果時發生錯誤：' + e.message, '#c0392b');
+  }
+}
+
+function fmtEvalue(e) {
+  if (e === 0) return '0';
+  if (e >= 0.001) return e.toFixed(4);
+  const exp = Math.floor(Math.log10(e));
+  const man = (e / Math.pow(10, exp)).toFixed(2);
+  return man + 'e' + exp;
+}
+
+function renderBlastTable() {
+  const filter  = document.getElementById('blast-filter').value.toLowerCase();
+  const minId   = parseFloat(document.getElementById('blast-minid').value)   || 0;
+  const minQcov = parseFloat(document.getElementById('blast-minqcov').value) || 0;
+  let hits = blastAllHits.filter(h =>
+    (!filter || h.sp_name.toLowerCase().includes(filter) || h.gene_id.toLowerCase().includes(filter)) &&
+    h.pct_id >= minId &&
+    h.qcov   >= minQcov
+  );
+
+  hits = [...hits].sort((a, b) => {
+    let va = a[blastSortCol], vb = b[blastSortCol];
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    if (va < vb) return blastSortAsc ? -1 : 1;
+    if (va > vb) return blastSortAsc ? 1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('blast-tbody');
+  tbody.innerHTML = hits.map((h, idx) => {
+    const idColor = h.pct_id >= 90 ? '#1a7a2b' : h.pct_id >= 60 ? '#e07b39' : '#c0392b';
+    return `<tr style="cursor:pointer;" onclick="showBlastAlign(${blastAllHits.indexOf(h)})">
+      <td style="color:var(--text-muted)">${idx + 1}</td>
+      <td><em>${h.sp_name}</em></td>
+      <td style="font-family:monospace;font-size:.74rem;">${h.gene_id}</td>
+      <td style="color:${idColor};font-weight:600;">${h.pct_id}%</td>
+      <td>${h.qcov}%</td>
+      <td>${h.align_len.toLocaleString()}</td>
+      <td style="font-family:monospace;">${fmtEvalue(h.evalue)}</td>
+      <td>${h.score}</td>
+      <td style="font-size:.71rem;color:var(--text-muted);">${h.q_from}–${h.q_to}</td>
+      <td style="font-size:.71rem;color:var(--text-muted);">${h.h_from}–${h.h_to}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('blast-footer').textContent =
+    `顯示 ${hits.length} / ${blastAllHits.length} 筆結果　點擊任一列查看比對詳情`;
+}
+
+function filterBlastResults() { renderBlastTable(); }
+
+function sortBlast(col) {
+  if (blastSortCol === col) blastSortAsc = !blastSortAsc;
+  else { blastSortCol = col; blastSortAsc = col === 'evalue' ? true : false; }
+  renderBlastTable();
+}
+
+function showBlastAlign(idx) {
+  const h = blastAllHits[idx];
+  if (!h.qseq) return;
+  const card = document.getElementById('blast-align-card');
+  document.getElementById('blast-align-title').innerHTML =
+    `Alignment — <em>${h.sp_name}</em> | ${h.gene_id}　` +
+    `Identity: ${h.pct_id}%　E-value: ${fmtEvalue(h.evalue)}　Score: ${h.score}`;
+
+  // Format alignment in BLAST-style blocks of 60
+  const block = 60;
+  let lines = '';
+  for (let i = 0; i < h.qseq.length; i += block) {
+    const q = h.qseq.slice(i, i + block);
+    const m = h.midline.slice(i, i + block);
+    const s = h.hseq.slice(i, i + block);
+    const qstart = h.q_from + i;
+    const sstart = h.h_from + i;
+    lines += `Query  ${String(qstart).padStart(6)}  ${q}  ${qstart + q.length - 1}\n`;
+    lines += `              ${m}\n`;
+    lines += `Sbjct  ${String(sstart).padStart(6)}  ${s}  ${sstart + s.length - 1}\n\n`;
+  }
+  document.getElementById('blast-align-pre').textContent = lines;
+  card.style.display = '';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function downloadBlastTSV() {
+  const headers = ['#','Species','Gene_ID','Identity%','QCov%','Align_Len','E-value','Bit_Score','Q_start','Q_end','S_start','S_end'];
+  const rows = blastAllHits.map((h, i) =>
+    [i+1, h.sp_name, h.gene_id, h.pct_id, h.qcov, h.align_len,
+     fmtEvalue(h.evalue), h.score, h.q_from, h.q_to, h.h_from, h.h_to].join('\t')
+  );
+  const tsv = [headers.join('\t'), ...rows].join('\n');
+  const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'blast_results.tsv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function clearBlast() {
+  document.getElementById('blast-query').value = '';
+  document.getElementById('blast-results-card').style.display = 'none';
+  document.getElementById('blast-align-card').style.display = 'none';
+  document.getElementById('blast-unavail').style.display = 'none';
+  setBlastStatus('');
+  blastAllHits = [];
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TAB — RNA-seq Analysis (Native)
+// ════════════════════════════════════════════════════════════════════════════
+const NPG_COLORS = ['#3C5488','#00A087','#E64B35','#4DBBD5','#8491B4','#F39B7F','#91D1C2','#DC0000'];
+let degResults = null;   // last DESeq2 results
+let degPadjCutoff = 0.05;
+let degLfcCutoff  = 1.0;
+
+// Inner tab switcher
+function showRnaseqTab(name, btn) {
+  ['pca','volcano','topdegs','table'].forEach(t => {
+    document.getElementById('rnaseq-panel-' + t).classList.toggle('active', t === name);
+  });
+  document.querySelectorAll('.rnaseq-inner-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// Status helper
+function setRnaseqStatus(msg, cls) {
+  const el = document.getElementById('rnaseq-status');
+  el.className = 'rnaseq-status ' + (cls || '');
+  el.textContent = msg;
+}
+
+// ── initRnaseq: fetch sample info and populate group checkboxes ───────────
+async function initRnaseq() {
+  try {
+    const r = await fetch('/api/rnaseq/info');
+    if (!r.ok) throw new Error(await r.text());
+    const info = await r.json();
+    const wrap = document.getElementById('rnaseq-group-checks');
+    wrap.innerHTML = '';
+    info.groups.forEach((g, i) => {
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = g; cb.checked = true;
+      cb.id = 'pca-grp-' + g;
+      const span = document.createElement('span');
+      span.textContent = g;
+      span.style.cssText = `background:${NPG_COLORS[i % NPG_COLORS.length]}22;color:${NPG_COLORS[i % NPG_COLORS.length]};padding:1px 6px;border-radius:3px;font-weight:600;font-size:.78rem;`;
+      label.appendChild(cb); label.appendChild(span);
+      wrap.appendChild(label);
+    });
+  } catch (e) {
+    document.getElementById('rnaseq-group-checks').innerHTML =
+      '<span style="color:#c0392b;font-size:.78rem;">載入失敗: ' + e.message + '</span>';
+  }
+}
+
+// ── runPCA ────────────────────────────────────────────────────────────────
+async function runPCA() {
+  // Collect selected groups → selected sample names
+  const info_r = await fetch('/api/rnaseq/info');
+  if (!info_r.ok) { setRnaseqStatus('無法取得樣本資訊', 'error'); return; }
+  const info = await info_r.json();
+
+  const selGroups = new Set(
+    [...document.querySelectorAll('#rnaseq-group-checks input:checked')].map(cb => cb.value)
+  );
+  const selSamples = info.samples.filter(s => selGroups.has(s.group)).map(s => s.name);
+  if (selSamples.length < 3) { setRnaseqStatus('請至少選擇 3 個樣本', 'error'); return; }
+
+  setRnaseqStatus('⏳ 計算 PCA 中（約 5–10 秒）…', 'running');
+  showRnaseqTab('pca', document.querySelector('.rnaseq-inner-tab'));
+
+  try {
+    const r = await fetch('/api/rnaseq/pca', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ samples: selSamples, n_top_genes: 2000 }),
+    });
+    if (!r.ok) {
+      const e = await r.json();
+      setRnaseqStatus('PCA 失敗: ' + (e.error || r.statusText), 'error');
+      return;
+    }
+    const data = await r.json();
+
+    // Build traces per group
+    const groupSet = [...new Set(data.group)];
+    const tissueSymbols = { co:0, li:1, pe:2, se:3, l:4, r:5, s:6, unknown:100 };
+    const SYMBOLS = ['circle','square','diamond','cross','x','triangle-up','triangle-down'];
+
+    const traces = groupSet.map((grp, gi) => {
+      const mask = data.group.map((g, i) => g === grp ? i : -1).filter(i => i >= 0);
+      return {
+        type: 'scatter',
+        mode: 'markers+text',
+        name: grp,
+        x: mask.map(i => data.pc[i][0]),
+        y: mask.map(i => data.pc[i][1]),
+        text: mask.map(i => data.samples[i]),
+        textposition: 'top center',
+        textfont: { size: 8, color: '#555' },
+        marker: {
+          size: 10,
+          color: NPG_COLORS[gi % NPG_COLORS.length],
+          symbol: mask.map(i => {
+            const t = data.tissue[i];
+            const si = tissueSymbols[t] !== undefined ? tissueSymbols[t] : 0;
+            return SYMBOLS[si % SYMBOLS.length];
+          }),
+          opacity: 0.85,
+          line: { width: 1, color: 'white' },
+        },
+        hovertemplate: '<b>%{text}</b><br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra>' + grp + '</extra>',
+      };
+    });
+
+    Plotly.newPlot('chart-rnaseq-pca', traces, {
+      paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: 'Source Sans 3, Helvetica Neue, Arial', size: 12 },
+      xaxis: { title: `PC1 (${data.variance_explained[0]}%)`, gridcolor: '#e9ecef', zeroline: true },
+      yaxis: { title: `PC2 (${data.variance_explained[1]}%)`, gridcolor: '#e9ecef', zeroline: true },
+      legend: { bgcolor: 'rgba(255,255,255,0.8)', bordercolor: '#ddd', borderwidth: 1 },
+      margin: { t: 30, r: 30, b: 60, l: 70 },
+    }, { responsive: true, displayModeBar: true });
+
+    setRnaseqStatus(`PCA 完成 — ${selSamples.length} 個樣本，Top 2000 基因`, 'done');
+  } catch (e) {
+    setRnaseqStatus('PCA 錯誤: ' + e.message, 'error');
+  }
+}
+
+// ── runDESeq2 ─────────────────────────────────────────────────────────────
+async function runDESeq2() {
+  const group_a = document.getElementById('de-group-a').value;
+  const group_b = document.getElementById('de-group-b').value;
+  const tissue  = document.getElementById('de-tissue').value;
+  degPadjCutoff = parseFloat(document.getElementById('de-padj').value) || 0.05;
+  degLfcCutoff  = parseFloat(document.getElementById('de-lfc').value)  || 1.0;
+
+  if (group_a === group_b) { setRnaseqStatus('Group A 和 Group B 不能相同', 'error'); return; }
+
+  setRnaseqStatus('⏳ 執行 DESeq2 中（約 30–60 秒）…', 'running');
+
+  try {
+    const r = await fetch('/api/rnaseq/deseq2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_a, group_b, tissue: tissue || null,
+        padj_cutoff: degPadjCutoff, lfc_cutoff: degLfcCutoff }),
+    });
+    const data = await r.json();
+    if (!r.ok) { setRnaseqStatus('DESeq2 失敗: ' + (data.error || r.statusText), 'error'); return; }
+
+    degResults = data;
+
+    // Stat cards
+    document.getElementById('stat-comparison').textContent = data.comparison;
+    document.getElementById('stat-n-up').textContent       = data.n_sig_up.toLocaleString();
+    document.getElementById('stat-n-down').textContent     = data.n_sig_down.toLocaleString();
+    document.getElementById('stat-n-a').textContent        = data.n_samples_a;
+    document.getElementById('stat-n-b').textContent        = data.n_samples_b;
+    document.getElementById('rnaseq-stats-row').style.display = 'flex';
+
+    plotVolcano(data);
+    plotTopDEGs(data);
+    renderDEGTable(data);
+
+    const total = data.n_sig_up + data.n_sig_down;
+    setRnaseqStatus(
+      `DESeq2 完成 — ${total} 個顯著 DEGs (↑${data.n_sig_up} ↓${data.n_sig_down})`, 'done'
+    );
+    // Switch to volcano
+    showRnaseqTab('volcano', document.querySelectorAll('.rnaseq-inner-tab')[1]);
+  } catch (e) {
+    setRnaseqStatus('錯誤: ' + e.message, 'error');
+  }
+}
+
+// ── Volcano plot ───────────────────────────────────────────────────────────
+function plotVolcano(data) {
+  const genes = data.genes, lfc = data.log2fc, padj = data.padj;
+  const logp  = padj.map(p => p != null ? -Math.log10(Math.max(p, 1e-300)) : null);
+  const padjLine = -Math.log10(degPadjCutoff);
+
+  const colors = genes.map((g, i) => {
+    const p = padj[i], l = lfc[i];
+    if (p == null || l == null) return '#D9D9D9';
+    if (p < degPadjCutoff && l >=  degLfcCutoff) return '#E64B35';  // up
+    if (p < degPadjCutoff && l <= -degLfcCutoff) return '#3C5488';  // down
+    return '#D9D9D9';
+  });
+
+  Plotly.newPlot('chart-rnaseq-volcano', [{
+    type: 'scatter', mode: 'markers',
+    x: lfc, y: logp,
+    text: genes,
+    marker: { color: colors, size: 5, opacity: 0.75 },
+    hovertemplate: '<b>%{text}</b><br>log2FC: %{x:.3f}<br>-log10(padj): %{y:.2f}<extra></extra>',
+  }], {
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Source Sans 3, Helvetica Neue, Arial', size: 12 },
+    xaxis: { title: 'log2 Fold Change', gridcolor: '#e9ecef', zeroline: true, zerolinecolor: '#aaa' },
+    yaxis: { title: '-log10(padj)', gridcolor: '#e9ecef' },
+    shapes: [
+      // padj cutoff line
+      { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: padjLine, y1: padjLine,
+        line: { color: '#888', dash: 'dash', width: 1 } },
+      // +lfc line
+      { type: 'line', xref: 'x', x0: degLfcCutoff, x1: degLfcCutoff, yref: 'paper', y0: 0, y1: 1,
+        line: { color: '#E64B35', dash: 'dash', width: 1, opacity: 0.5 } },
+      // -lfc line
+      { type: 'line', xref: 'x', x0: -degLfcCutoff, x1: -degLfcCutoff, yref: 'paper', y0: 0, y1: 1,
+        line: { color: '#3C5488', dash: 'dash', width: 1, opacity: 0.5 } },
+    ],
+    margin: { t: 30, r: 30, b: 60, l: 70 },
+  }, { responsive: true, displayModeBar: true });
+}
+
+// ── Top DEGs bar ──────────────────────────────────────────────────────────
+function plotTopDEGs(data) {
+  const genes = data.genes, lfc = data.log2fc, padj = data.padj;
+
+  // Filter significant
+  const sig = genes.map((g, i) => ({ g, l: lfc[i], p: padj[i] }))
+    .filter(d => d.p != null && d.l != null && d.p < degPadjCutoff && Math.abs(d.l) >= degLfcCutoff);
+
+  // Sort by |lfc| descending, take top 20
+  sig.sort((a, b) => Math.abs(b.l) - Math.abs(a.l));
+  const top20 = sig.slice(0, 20).reverse();
+
+  Plotly.newPlot('chart-rnaseq-topdegs', [{
+    type: 'bar', orientation: 'h',
+    y: top20.map(d => d.g),
+    x: top20.map(d => d.l),
+    marker: {
+      color: top20.map(d => d.l > 0 ? '#00A087' : '#E64B35'),
+      opacity: 0.85,
+    },
+    hovertemplate: '<b>%{y}</b><br>log2FC: %{x:.3f}<extra></extra>',
+  }], {
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Source Sans 3, Helvetica Neue, Arial', size: 12 },
+    xaxis: { title: 'log2 Fold Change', gridcolor: '#e9ecef', zeroline: true },
+    yaxis: { tickfont: { size: 10 }, autorange: true },
+    margin: { t: 30, r: 30, b: 60, l: 160 },
+    title: { text: `Top 20 DEGs (${data.comparison})`, font: { size: 13 }, x: 0.5 },
+  }, { responsive: true, displayModeBar: false });
+}
+
+// ── DEG result table ──────────────────────────────────────────────────────
+function renderDEGTable(data) {
+  const genes = data.genes, lfc = data.log2fc, padj = data.padj, bm = data.baseMean;
+
+  const sig = genes.map((g, i) => ({ g, l: lfc[i], p: padj[i], b: bm[i] }))
+    .filter(d => d.p != null && d.l != null && d.p < degPadjCutoff && Math.abs(d.l) >= degLfcCutoff);
+  sig.sort((a, b) => Math.abs(b.l) - Math.abs(a.l));
+
+  document.getElementById('deg-table-info').textContent =
+    `${sig.length.toLocaleString()} 個顯著 DEGs (padj < ${degPadjCutoff}, |log2FC| ≥ ${degLfcCutoff})`;
+
+  const tbody = document.getElementById('deg-tbody');
+  if (sig.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem;">無顯著 DEGs</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sig.map(d => {
+    const reg = d.l > 0
+      ? '<span class="deg-badge badge-up">Up</span>'
+      : '<span class="deg-badge badge-down">Down</span>';
+    return `<tr>
+      <td style="font-family:monospace;font-size:.78rem;">${esc(d.g)}</td>
+      <td style="font-weight:600;color:${d.l > 0 ? '#c0392b' : '#1a56db'}">${d.l.toFixed(3)}</td>
+      <td style="font-family:monospace;font-size:.78rem;">${d.p.toExponential(2)}</td>
+      <td>${d.b != null ? d.b.toFixed(1) : '—'}</td>
+      <td>${reg}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Download DEG CSV ──────────────────────────────────────────────────────
+function downloadDEGcsv() {
+  if (!degResults) { alert('請先執行 DESeq2'); return; }
+  const data = degResults;
+  const genes = data.genes, lfc = data.log2fc, padj = data.padj, bm = data.baseMean;
+  const sig = genes.map((g, i) => ({ g, l: lfc[i], p: padj[i], b: bm[i] }))
+    .filter(d => d.p != null && d.l != null && d.p < degPadjCutoff && Math.abs(d.l) >= degLfcCutoff);
+  sig.sort((a, b) => Math.abs(b.l) - Math.abs(a.l));
+
+  const header = 'Gene,log2FoldChange,padj,baseMean,Regulation';
+  const rows = sig.map(d =>
+    `${d.g},${d.l.toFixed(4)},${d.p.toExponential(4)},${d.b != null ? d.b.toFixed(2) : ''},${d.l > 0 ? 'Up' : 'Down'}`
+  );
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `DESeq2_${data.comparison.replace(/ /g,'_')}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── VIGS ──────────────────────────────────────────────────────────────────────
+let vigsData = null;
+let vigsSpecies = [];
+
+async function initVIGS() {
+  const resp = await fetch('/api/vigs/species');
+  vigsSpecies = await resp.json();
+
+  // Populate source species selector
+  const srcSel = document.getElementById('vigs-src-sp');
+  const dbSel  = document.getElementById('vigs-db-sp');
+  srcSel.innerHTML = '<option value="">— 選擇物種 —</option>';
+  dbSel.innerHTML  = '';
+
+  vigsSpecies.forEach(sp => {
+    const opt1 = document.createElement('option');
+    opt1.value = sp.id; opt1.textContent = sp.name;
+    srcSel.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = sp.id;
+    opt2.textContent = sp.name + (sp.ready ? '' : ' ⏳');
+    opt2.disabled = !sp.ready;
+    if (sp.id === 'Dthyrsiflorum') opt2.selected = true;
+    dbSel.appendChild(opt2);
+  });
+}
+
+async function vigsLoadGenes() {
+  const spId = document.getElementById('vigs-src-sp').value;
+  const listEl = document.getElementById('vigs-gene-list');
+  listEl.innerHTML = '<option>載入中…</option>';
+  if (!spId) { listEl.innerHTML = ''; return; }
+  const resp = await fetch(`/api/vigs/genes/${spId}`);
+  const genes = await resp.json();
+  listEl.innerHTML = genes.map(g => `<option value="${g}">${g}</option>`).join('');
+}
+
+async function vigsSearchGenes() {
+  const spId = document.getElementById('vigs-src-sp').value;
+  const q    = document.getElementById('vigs-gene-q').value.trim();
+  if (!spId) return;
+  const resp = await fetch(`/api/vigs/genes/${spId}?q=${encodeURIComponent(q)}`);
+  const genes = await resp.json();
+  const listEl = document.getElementById('vigs-gene-list');
+  listEl.innerHTML = genes.map(g => `<option value="${g}">${g}</option>`).join('');
+}
+
+async function vigsLoadSeq() {
+  const spId  = document.getElementById('vigs-src-sp').value;
+  const listEl = document.getElementById('vigs-gene-list');
+  const geneId = listEl.value || document.getElementById('vigs-gene-q').value.trim();
+  if (!spId || !geneId) { alert('請先選擇物種和基因'); return; }
+  setVigsStatus('載入序列中…', 'running');
+  const resp = await fetch(`/api/vigs/seq/${spId}/${encodeURIComponent(geneId)}`);
+  const d = await resp.json();
+  if (d.error) { setVigsStatus('錯誤：' + d.error, 'error'); return; }
+  document.getElementById('vigs-seq').value = d.fasta;
+  setVigsStatus(`已載入 ${geneId} (${spId})`, 'done');
+}
+
+function setVigsStatus(msg, type) {
+  const el = document.getElementById('vigs-status');
+  el.textContent = msg;
+  el.className = 'rnaseq-status ' + (type || '');
+}
+
+async function runVIGS() {
+  const seq     = document.getElementById('vigs-seq').value.trim();
+  const merSize = parseInt(document.getElementById('vigs-mer').value)  || 21;
+  const fragLen = parseInt(document.getElementById('vigs-frag').value) || 300;
+  const mm      = parseInt(document.getElementById('vigs-mm').value);
+  if (!seq) { setVigsStatus('請輸入序列', 'error'); return; }
+
+  document.getElementById('vigs-placeholder').style.display = 'none';
+  document.getElementById('vigs-summary').style.display     = 'none';
+  document.getElementById('vigs-table-wrap').style.display  = 'none';
+  document.getElementById('vigs-dist-chart').style.display  = 'none';
+  document.getElementById('vigs-construct').style.display   = 'none';
+  document.getElementById('vigs-chart').style.display       = 'none';
+  setVigsStatus('⏳ 比對中，請稍候…', 'running');
+
+  try {
+    const resp = await fetch('/api/vigs/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sequence: seq, mer_size: merSize, frag_len: fragLen,
+        mismatches: mm,
+        db_species: document.getElementById('vigs-db-sp').value || 'Dthyrsiflorum'
+      })
+    });
+    const d = await resp.json();
+    if (d.error) { setVigsStatus('錯誤：' + d.error, 'error'); return; }
+    vigsData = d;
+
+    const scoreColor = d.best_score >= 70 ? '#00A087' : d.best_score >= 40 ? '#F39B7F' : '#E64B35';
+    setVigsStatus(
+      `完成 — ${d.n_genes_hit} 個基因命中，${d.pct_mapped}% n-mer 比對成功，最佳分數 ${d.best_score}/100`,
+      'done'
+    );
+
+    // Stat cards
+    document.getElementById('vs-seqlen').textContent = d.seq_len;
+    document.getElementById('vs-mers').textContent   = d.total_mers;
+    document.getElementById('vs-mapped').textContent = d.pct_mapped + '%';
+    document.getElementById('vs-genes').textContent  = d.n_genes_hit;
+    const scoreEl = document.getElementById('vs-score');
+    scoreEl.textContent = d.best_score;
+    scoreEl.style.color = scoreColor;
+    document.getElementById('vigs-summary').style.display = 'flex';
+
+    // ── N-mer distribution chart ─────────────────────────────────────────
+    // per_pos arrays are now nucleotide-level (length = seq_len), matching original VIGS algorithm
+    const xs = Array.from({length: d.per_pos_target.length}, (_, i) => i + 1);
+    document.getElementById('vigs-dist-chart').style.display = 'block';
+
+    // Sliding window score trace: target - off_target*1.5 (original formula), window = frag_len nt
+    const scoreTrace = new Array(xs.length).fill(0);
+    let runT = 0, runO = 0;
+    for (let i = 0; i < xs.length; i++) {
+      runT += d.per_pos_target[i];
+      runO += d.per_pos_offtarget[i];
+      if (i >= fragLen) {
+        runT -= d.per_pos_target[i - fragLen];
+        runO -= d.per_pos_offtarget[i - fragLen];
+      }
+      scoreTrace[i] = runT - runO * 1.5;
+    }
+
+    Plotly.newPlot('vigs-dist-chart', [
+      {
+        name: `目標基因命中 (${d.n_targets} 個)`, type: 'bar', x: xs, y: d.per_pos_target,
+        marker: { color: 'rgba(59,130,246,0.7)' },
+        hovertemplate: 'nt %{x}: %{y} target gene(s)<extra></extra>'
+      },
+      {
+        name: '脫靶基因命中', type: 'bar', x: xs, y: d.per_pos_offtarget.map(v => -v),
+        marker: { color: 'rgba(239,68,68,0.7)' },
+        hovertemplate: 'nt %{x}: %{y} off-target gene(s)<extra></extra>'
+      },
+      {
+        name: `視窗分數 (T−OT×1.5, w=${fragLen}bp)`, type: 'scatter', mode: 'lines', x: xs, y: scoreTrace,
+        line: { color: '#16a34a', width: 1.5 },
+        yaxis: 'y2',
+        hovertemplate: 'nt %{x}: score %{y:.2f}<extra></extra>'
+      }
+    ], {
+      barmode: 'relative',
+      shapes: [{
+        type: 'rect', xref: 'x', yref: 'paper',
+        x0: d.best_start + 1, x1: d.best_end,
+        y0: 0, y1: 1,
+        fillcolor: 'rgba(234,179,8,0.15)',
+        line: { color: 'rgba(234,179,8,0.6)', width: 1.5, dash: 'dot' }
+      }],
+      annotations: [{
+        x: (d.best_start + d.best_end) / 2 + 1, y: 1.06, xref: 'x', yref: 'paper',
+        text: `最佳片段 nt ${d.best_start+1}–${d.best_end}`, showarrow: false,
+        font: { size: 10, color: '#92400e' }, bgcolor: 'rgba(254,243,199,0.8)',
+        bordercolor: '#fcd34d', borderwidth: 1
+      }],
+      xaxis: { title: '核苷酸位置 (bp)', tickfont: { size: 10 } },
+      yaxis: { title: '基因覆蓋數', zeroline: true, zerolinecolor: '#ccc' },
+      yaxis2: { title: '視窗分數', overlaying: 'y', side: 'right', showgrid: false },
+      legend: { orientation: 'h', y: -0.2 },
+      title: { text: 'N-mer 位置分佈（藍=目標命中 / 紅=脫靶 / 黃框=推薦片段）', font: { size: 12 } },
+      margin: { l: 55, r: 55, t: 40, b: 55 },
+      paper_bgcolor: 'white', plot_bgcolor: 'white',
+    }, { responsive: true });
+
+    // ── Construct FASTA ──────────────────────────────────────────────────
+    document.getElementById('vigs-construct-seq').textContent   = d.construct_fasta;
+    document.getElementById('vigs-construct-range').textContent =
+      `位置 ${d.best_start+1}–${d.best_end} bp｜分數 ${d.best_score}/100`;
+    document.getElementById('vigs-construct').style.display = 'block';
+
+    // ── Off-target bar chart ─────────────────────────────────────────────
+    const top    = d.hits.slice(0, 30);
+    const colors = top.map(h => h.coverage_pct >= 50 ? '#E64B35' : h.coverage_pct >= 20 ? '#F39B7F' : '#4DBBD5');
+    const chartEl = document.getElementById('vigs-chart');
+    chartEl.style.display = 'block';
+    Plotly.newPlot('vigs-chart', [{
+      type: 'bar', orientation: 'h',
+      x: top.map(h => h.coverage_pct).reverse(),
+      y: top.map(h => h.gene).reverse(),
+      marker: { color: colors.slice().reverse() },
+      text: top.map(h => h.n_mers + ' mers').reverse(),
+      textposition: 'outside',
+      hovertemplate: '%{y}<br>Coverage: %{x}%<br>%{text}<extra></extra>'
+    }], {
+      margin: { l: 180, r: 60, t: 30, b: 50 },
+      xaxis: { title: '序列覆蓋率 (%)', range: [0, 110] },
+      yaxis: { tickfont: { size: 11 } },
+      title: { text: `脫靶風險基因（Top ${top.length}）`, font: { size: 12 } },
+      paper_bgcolor: 'white', plot_bgcolor: 'white',
+    }, { responsive: true });
+
+    // ── Table ────────────────────────────────────────────────────────────
+    const tbody = document.getElementById('vigs-tbody');
+    tbody.innerHTML = '';
+    d.hits.forEach((h, i) => {
+      const isTarget = h.gene === d.target_gene;
+      const risk = isTarget
+        ? '<span class="deg-badge" style="background:#dbeafe;color:#1d4ed8;">目標基因</span>'
+        : h.coverage_pct >= 50 ? '<span class="deg-badge badge-up">高風險脫靶</span>'
+        : h.coverage_pct >= 20 ? '<span class="deg-badge" style="background:#fff3e0;color:#e65100;">中風險</span>'
+        : '<span class="deg-badge badge-down">低風險</span>';
+      tbody.innerHTML += `<tr style="border-bottom:1px solid var(--border-light);${isTarget?'background:#eff6ff;':''}">
+        <td style="padding:.35rem .6rem;">${i+1}</td>
+        <td style="padding:.35rem .6rem;font-family:monospace;font-size:.8rem;">${h.gene}</td>
+        <td style="padding:.35rem .6rem;text-align:right;">${h.n_mers}</td>
+        <td style="padding:.35rem .6rem;text-align:right;">${h.coverage_pct}%</td>
+        <td style="padding:.35rem .6rem;">${risk}</td>
+      </tr>`;
+    });
+    document.getElementById('vigs-table-wrap').style.display = 'block';
+
+  } catch(e) {
+    setVigsStatus('錯誤：' + e.message, 'error');
+  }
+}
+
+function copyConstruct() {
+  const txt = document.getElementById('vigs-construct-seq').textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = event.target;
+    btn.textContent = '已複製！'; setTimeout(() => btn.textContent = '複製 FASTA', 1500);
+  });
+}
+
+function downloadConstruct() {
+  if (!vigsData) return;
+  const blob = new Blob([vigsData.construct_fasta], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `VIGS_construct_${vigsData.best_start+1}-${vigsData.best_end}.fa`;
+  a.click();
+}
+
+function downloadVIGScsv() {
+  if (!vigsData) return;
+  const header = 'Rank,Gene,N_mers,Coverage_pct,Role';
+  const rows = vigsData.hits.map((h, i) =>
+    `${i+1},${h.gene},${h.n_mers},${h.coverage_pct},${h.gene===vigsData.target_gene?'target':'offtarget'}`
+  );
+  const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'VIGS_offtarget_results.csv';
+  a.click();
+}
+</script>
+</body>
+</html>

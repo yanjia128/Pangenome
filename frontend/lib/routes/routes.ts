@@ -1,8 +1,15 @@
 export enum ROUTES {
   LANDING_PAGE = "/",
+  HOME = "/home",
+  ANNOTATION = "/Annotation",
+  STATISTICS = "/statistics",
+  LEGACY_ANALYSIS = "/analysis",
   BLOG = "/blog",
   PUBLICATION_PAGE = "/blog/:publication",
   ORTHOGROUPS = "/orthogroups",
-  PHYLOXONIUM = "/phyloxonium",
   PHYLOCANVAS = "/phylocanvas",
+  TRANSCRIPTOME = "/transcriptome",
+  ENRICHMENT = "/enrichment",
+  SYNTENY = "/syntney",
+  CONTACT = "/contact",
 }

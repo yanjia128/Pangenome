@@ -33,7 +33,14 @@ export function getPublicationEndpoint(slug: string) {
 export const getPublicationsEndpoint = "/api/publications/";
 export const getPaginatedPublicationsEndpoint = getPublicationsEndpoint + "p/";
 export const getOrthogroupsEndpoint = "/api/orthogroups/";
+export function getOrthogroupFastaDownloadEndpoint(orthogroupId: string) {
+  return `/api/orthogroups/${orthogroupId}/download/`;
+}
+export const getAnnotationEndpoint = "/api/annotation/";
 export const getGeneTreesEndpoint = "/api/gene-trees/";
+export const getDifferentialExpressionEndpoint = "/api/differential-expression/";
+export const getEnrichmentAnalysisEndpoint = "/api/enrichment/";
+export const getEnrichmentExampleGenesEndpoint = "/api/enrichment/example-genes/";
 export function getGeneTreeDetailEndpoint(treeId: string) {
   return `/api/gene-trees/${treeId}/`;
 }

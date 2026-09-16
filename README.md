@@ -1,221 +1,208 @@
-# django-react-typescript <!-- omit from toc -->
+# 斛基對鑑（Dendrobium PhyloGenomics Compare）
 
-<img alt="django-react-typescript logo" src="assets/Logo.png" align="right" width="120" height="120" />
-
-This is an non-opinionated Django 5 + React 18 boilerplate built with great development experience and easy deployment in mind.
-
-This template is ideal if you want to bootstrap a blog or a portfolio website quickly, or even a more complex application that requires a CMS, all while leveraging the best from React and Django.
+> 石斛多物種比較基因組平台  
+> 以 Django + React 建構，整合 **26 個石斛物種** 的親緣、基因組結構比較與轉錄體差異表現分析。
 
 ---
 
-- [Getting started](#getting-started)
-  - [Setting up a database](#setting-up-a-database)
-  - [Setting up a CDN](#setting-up-a-cdn)
-  - [Running the project](#running-the-project)
-- [Application architecture](#application-architecture)
-  - [Features](#features)
-- [Going to production: infrastructure \& deployment](#going-to-production-infrastructure--deployment)
-  - [Virtualized Deploy Workflow](#virtualized-deploy-workflow)
-  - [Bare-metal Deploy Workflow](#bare-metal-deploy-workflow)
-  - [Configuration](#configuration)
-  - [Architecture overview](#architecture-overview)
-- [Similar projects](#similar-projects)
+## 專案簡介
 
-## Getting started
+本專案是石斛 pangenome 網站，前端由 React/TypeScript 實作，後端由 Django + DRF 提供資料 API。  
+目前前端核心重點為：
 
-This project relies on [pnpm](https://pnpm.io/) and [Poetry](https://python-poetry.org/) to manage Node.js and Python dependencies, respectively. Make sure to have both installed on your machine before proceeding.
+1. 物種親緣關係與基因樹視覺化（Phylogenetic tree）
+2. 物種間基因組結構/同源關係比較（Orthogroup、Ks、Dotplot）
+3. 差異表現分析流程（edgeR / DESeq2）
+4. JBrowse 基因組瀏覽器整合
 
-After cloning this project, install all dependencies by running:
+網路與部署連線說明請見：[docs/network-architecture.md](docs/network-architecture.md)
 
-```sh
+---
+
+## 技術堆疊
+
+| 層級 | 技術 |
+| --- | --- |
+| Frontend | React 19, TypeScript 5, React Router 6, Flowbite React, Tailwind CSS, Plotly, Phylocanvas, phyloxonium |
+| Backend | Django, Django REST Framework, Token Authentication |
+| Database | PostgreSQL |
+| 建置工具 | Webpack 5, pnpm, Poetry |
+
+---
+
+## 伺服器營運方式統整（目前）
+
+| 版本 | 主要用途 | 啟動方式 | 對外位址 |
+| --- | --- | --- | --- |
+| 原生開發版（目前主要） | 日常開發與資料調整 | `pnpm dev`（或 `pnpm dev:full`） | Frontend `:4000`、Backend `:8866` |
+| Docker 版 | 模擬生產流程與容器化佈署 | `docker compose -f docker-compose.yml up` | Web `:8000`（含 postgres/memcached） |
+| Bare-metal 舊版 | 歷史部署流程參考 | supervisor + nginx（見 `config/` 與 workflow） | 依主機設定 |
+
+---
+
+## 0.0.0.0 架設（雙版本）
+
+### 1. 安裝相依
+
+```bash
 pnpm run bootstrap
 ```
 
-This command will install all dependencies for the frontend (React) and backend (Django) apps.
+### 2. 設定環境變數
 
-### Setting up a database
+1. 複製根目錄 `.env.example` 為 `.env`，填入資料庫與 Django 設定。  
+2. 複製 `frontend/.env.example`，至少設定 `AUTH_TOKEN`（DRF Token）。
 
-To start developing on this project, you will need a Postgres database instance running. It doesn 't matter if it's a local instance or a remote one. Just make sure to set up a Postgres database and configure the `.env` file with the correct credentials.
+### 3A. 原生版本（你目前使用的方式）
 
-For convenience, if you want to use Docker + Docker Compose to spin up a Postgres instance locally, with pgAdmin using alongisde, use the following command:
-
-```sh
-pnpm run dev:db:up
+```bash
+pnpm dev
 ```
 
-### Setting up a CDN
+- Frontend: `http://0.0.0.0:4000`
+- Backend API: `http://0.0.0.0:8866`
+- 若需本地 PostgreSQL 容器：
 
-This project uses Cloudinary as a CDN, so you will need to have an account on Cloudinary and set up the `.env` file with the correct credentials. Use the [`.env.example`](./.env.example) file as a reference.
-
-Feel free to open an issue if you want to use another CDN, and I'll be happy to help you set it up.
-
-### Running the project
-
-Once you've set up the database, you can start the project by running one of:
-
-```sh
-pnpm dev # Starts the project while assuming you've setup a database not using the Docker Compose setup. Spins up only the backend and frontend apps
-pnpm dev:full # Starts the project while assuming you've setup a database using the Docker Compose setup. Spins up a Postgres instance and pgAdmin alongside the backend and frontend apps
+```bash
+pnpm dev:full
 ```
 
-By default, the frontend app will run on `localhost:4000` and the backend app will run on `localhost:8000`. If you're running the containerized Postgres, it will run on `localhost:5432` and pgAdmin will run on `localhost:5050`.
+### 3B. Docker 版本（容器化）
 
-It's important to note that **for the best development experience, you should run the backend and frontend apps separately**. This way, you can take advantage of the hot-reload feature from Webpack and Django's development server.
-
-Although you can replicate the aforementioned behavior on a production environment (run the backend and frontend apps on differen servers), **this project is built to run both apps on the same server in production, with the frontend app being served by Django's template engine and view functions**. You can learn more about how everything is tied up together below 👇
-
-## Application architecture
-
-This application's architect is quite simple and leverages the best of both Django and React. On a nutshell, React and Django integrate through Django's view functions and Django Rest Framework's API endpoints. There is no secret sauce here, just a simple and straightforward integration.
-
-```mermaid 
-flowchart TD
-    ns("Frontend") --> ny("React") & n9("Env. variables")
-    nl("Backend") --> nt("Django") & ni("Django Rest Framework")
-    nt --> n5("Views") & nb("Templates") & na("Models")
-    n5 --> nb
-    ny --> n0("API Client") & n4("Root Container")
-    na --> nn("API Key") & nd("Publications")
-    n4 -- Mounts on same file from\nDjango templates --> nb
-    n9 -.-> nn & n0
-    ni -- Provides a REST\nendpoint to manipulate\ndata from models --> ng("REST API")
-    ng --> nd
-    n0 -- Consumes API Key\nto authenticate\nwith backend --> ng
+```bash
+docker compose -f docker-compose.yml -f docker-compose.localhost.yml up -d
 ```
 
-### Features
+- Web: `http://0.0.0.0:8000`
+- 停止：
 
-Below you will find the stack used for each part of the application and the features that are already implemented.
-
-| Stack      | Libraries and services                                            | Features                         |
-| ---------- | ----------------------------------------------------------------- | -------------------------------- |
-| Frontend   | React 18, React Router 6, Typescript 5, Webpack 5, Tailwind CSS 3 | Publication listing and search   |
-| Backend    | Django 5, Django Rest Framework                                   | Publication CRUD, API Key CRUD   |
-| Database   | Postgres                                                          | -                                |
-| CDN        | Cloudinary                                                        | -                                |
-| CI/CD      | GitHub Actions                                                    | Multiple deploy workflow options |
-| Monitoring | Sentry                                                            | -                                |
-
-## Going to production: infrastructure & deployment
-
-Although this project provides some guidelines on how to deploy the app, it is not mandatory to follow them. You can deploy the app on any platform you want, as long as it supports Docker and Docker Compose, or even deploy the app on a bare-metal machine. **By the end of the day, you should use the provided GitHub Actions workflows as a reference to build your own deployment pipeline and meet your requirements**.
-
-Nonetheless, this codebase has two deploy methods available via GitHub actions:
-
-### Virtualized Deploy Workflow
-
-The `vm-deploy` branch will trigger this wokflow. You can use it to deploy the app to any Virtual Machine accessible via SSH (AWS EC2s, GCloud apps, Digital Ocean droplets, Hostgator VPSs, etc), and you would likely want to change the name of these branches to something more meaningful to your project.
-
-This is what the workflow does:
-
-```mermaid
-flowchart LR
-    nv("Make changes to\nthe application") -- Commit --> n7("Build and test frontend\nand backend")
-    n7 --> nf{"Success?"}
-    nf -- Yes --> n2("Build and test docker\nimage")
-    nf -- No --> n4("Cancel pipeline")
-    n2 --> n5{"Success?"}
-    n5 -- No --> n4
-    n5 -- Yes --> nx("Publish docker image\nto GitHub packages")
-    nx --> nj{"Success?"}
-    nj -- No --> n4
-    nj -- Yes --> nd("Deploy")
-    nd --> nc("Login into VM and copy\ndocker compose file\nfrom repo")
-    nc --> n6{"Success?"}
-    n6 -- Yes --> no("Pull previously pushed Docker image\nand execute most recent\n docker compose file")
-    n6 -- No --> n4
-    no --> na{"Success?"}
-    na -- No --> ng("Better check your\nsystem's health")
-    na -- Yes --> nk("Updates are live")
+```bash
+docker compose -f docker-compose.yml -f docker-compose.localhost.yml down
 ```
 
-### Bare-metal Deploy Workflow
+---
 
-The `bare-metal-deploy` branches will trigger this workflow. You can use it to deploy the app straight on the host machine, without any virtualization. This is not recommended, but ou never know when you will need to deploy an app on a bare-metal machine 🤷‍♀️. This pipeline assumes that you've got Node.js, Python, [Gunicorn](https://gunicorn.org/) and [Supervisord](http://supervisord.org/) installed on the host machine.
+## Frontend 目前功能總覽
 
-This is what the workflow does:
+### 路由與功能
 
-```mermaid
-flowchart LR
-    nv("Make changes to\nthe application") -- Commit --> n7("Build and test frontend\nand backend")
-    n7 --> nf{"Success?"}
-    nf -- Yes --> n2("Logs into host machine\nand copy all relevant files\nfrom repo to it")
-    nf -- No --> n4("Cancel pipeline")
-    n2 --> n5{"Success?"}
-    n5 -- No --> n4
-    n5 -- Yes --> nx("Builds the frontend\nand the backend")
-    nx --> nj{"Success?"}
-    nj -- No --> n4
-    nj -- Yes --> nd("Deploy")
-    nd --> nc("Starts gunicorn server under\nsupervisor to ensure the\nsystem is never down")
-    na{"Success?"} -- No --> ng("Better manually log in\ninto host and fix it")
-    na -- Yes --> nk("Updates are live")
-    nc --> na
+| 路由 | 頁面 | 目前功能 |
+| --- | --- | --- |
+| `/` | Landing | 首頁摘要、最新文章預覽 |
+| `/home` | Pangenome Dashboard | 26 物種總覽統計、基因分類圓環圖、Pangenome/Core 累積曲線、物種別指標長條圖、Orthogroup overlap 熱圖、PCA、重複事件統計 |
+| `/analysis` | Analysis Figures | 物種樹圖、Ortholog 熱圖與細節、26×26 Ks 中位數熱圖與分佈、兩兩物種 dotplot 與總覽圖 |
+| `/orthogroups` | Orthogroups Table | Orthogroup 表格搜尋/分頁、欄位結果展開、FASTA 下載、可跳轉基因樹檢視 |
+| `/phylocanvas` | Gene Tree Viewer | 以 gene tree ID 載入 Newick、切換 tree layout（Rectangular/Radial/Circular...）、節點子樹高亮 |
+| `/phyloxonium` | Gene Tree Viewer (GL) | 以 phyloxonium 呈現替代版基因樹互動檢視 |
+| `/transcriptome` | Differential Expression | 載入 counts 表格、搜尋/排序/分頁、選 control/comparison 樣本、自動選 edgeR/DESeq2、顯示 Volcano/MA 圖 |
+| `/jbrowse` | Genome Browser | iframe 整合 JBrowse，啟動檢查與縮放操作 |
+| `/blog` | Publications | 文章列表、搜尋 |
+| `/blog/:publication` | Publication Detail | 單篇文章內容 |
+| `/contact` | Contact | 聯絡資訊頁面 |
+
+### 導覽列功能
+
+- Home、Analysis、Phylogene Tree、Group、Differential Expression (DEG)、Genome Browser、Contact
+- 外部工具連結：BLAST（開新分頁）
+
+---
+
+## Frontend 與後端 API 對接
+
+前端 API client：`frontend/lib/api/use-api.ts`  
+主要端點：
+
+| API | 用途 |
+| --- | --- |
+| `/api/publications/` | 文章列表/分頁/篩選 |
+| `/api/orthogroups/` | Orthogroup 表格資料（含搜尋與分頁） |
+| `/api/gene-trees/` | Gene tree 清單 |
+| `/api/gene-trees/{tree_id}/` | 單棵 gene tree Newick 內容 |
+| `/api/differential-expression/` | 差異表現分析（edgeR/DESeq2） |
+
+> API 需 Token 驗證，前端透過 `AUTH_TOKEN` 送出 `Authorization: Token ...`。
+
+---
+
+## 前端資料來源（目前實作）
+
+| 類型 | 來源 |
+| --- | --- |
+| Pangenome 統計資料 | `frontend/lib/pages/data.ts`（內建於前端 bundle） |
+| Ks 資料 | `frontend/lib/pages/ks_data.ts`（內建於前端 bundle） |
+| Species tree 圖 | `frontend/public/species_tree.png` |
+| Dotplot 圖群 | `frontend/public/dotplots/*.png` |
+| Transcriptome table | `frontend/public/table/*_counts.tsv` |
+| DEG 輸出圖（執行後） | `frontend/public/Data/DGA/...` |
+
+---
+
+## JBrowse 整合說明
+
+- 前端頁面：`/jbrowse`
+- 預設來源：`/dendrobium/syntney/`（`frontend/lib/pages/jbrowse.tsx`）
+- 可用 `frontend/.env` 的 `JBROWSE_SERVER_URL` 覆寫
+- 透過 Django 由路由 `^dendrobium/syntney/` 提供檔案（`core/urls.py`）
+- 路徑可由根目錄 `.env` 的 `JBROWSE_DIR` 覆寫；未設定時預設 `../JBrowse2_MultiWay`
+
+若有獨立 JBrowse 專案，可用：
+
+```bash
+pnpm run Jbrowse
 ```
 
-### Configuration
+> 也支援 `pnpm run jbrowse`（小寫別名）。
+>
+> 此啟動腳本會先檢查並停止占用 `9000` 的既有進程，再啟動 JBrowse 伺服器（備援用途）。  
+> 可用環境變數覆寫：
+> - `JBROWSE_DIR`：JBrowse 專案目錄（預設 `./../JBrowse2_MultiWay`）
+> - `JBROWSE_PORT`：伺服器埠號（預設 `9000`）
+> - `JBROWSE_BASE_PATH`：子路徑（預設 `/dendrobium/syntney`）
 
-You must be familiar with the expected environment variables to run the project. Here is a list of the environment variables you must set alongside the ones you already know ([`.env.example`](./.env.example) from root, [`.env.example`](./frontend/.env.example) from frontend) production environments and must be set as secrets on your GitHub repository and made available to GitHub Actions.
+正式環境（方案 A）建議由 nginx 直接提供靜態檔案並做路徑分流：
 
-| Environment variable | Description                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| IMAGE_NAME           | Docker image name                                                                     |
-| MODE                 | `production`. This is hardcoded on the [Dockerfile](./Dockerfile)                     |
-| ALLOWED_HOSTS        | A set of hosts allowed to pass CORS policy. I.g: "www.example.com" "example.com"      |
-| DEPLOY_TOKEN         | A Github token with permission to pull this project's image from your Github registry |
-| HOST                 | The domain under which your site will be hosted (i.g.:example.com)                    |
-| SSH_PRIVATE_KEY      | The SSH key used to access the host machine                                           |
-| USERNAME             | The SSH username used to access the host machine                                      |  |
+- `/dendrobium/`：React
+- `/dendrobium/syntney/`：JBrowse
 
-### Architecture overview
+此模式下不需要在正式環境額外啟動 `http-server`。
 
-Building up on the [application architecture diagram](#application-architecture), here is a more detailed overview of how the application is structured on a production environment:
+範例（請依你的實際目錄調整）：
 
-```mermaid
-flowchart TD
- subgraph subgraph_byfiey99u["Gunicorn"]
-        ny("React")
-        n9("Env. variables")
-        ns("Frontend")
-        nt("Django")
-        ni("Django Rest Framework")
-        nl("Backend")
-        n5("Views")
-        nb("Templates")
-        na("Models")
-        n0("API Client")
-        n4("Root Container")
-        nn("API Key")
-        nd("Publications")
-        ng("REST API")
-        react_assets("Static assets\n(React included)")
-  end
- subgraph subgraph_3hmsyzvqm["Docker Image/Host"]
-        subgraph_byfiey99u
-        nginx("NGINX")
-        pg("Postgres")
-  end
-    ns --> ny & n9
-    nl --> nt & ni
-    nt --> n5 & nb & na & subgraph_3hmsyzvqm
-    nt -- Stores media\nfiles on --> nk("CDN\n(Cloudinary)")
-    n5 --> nb
-    ny --> n0 & n4
-    na --> nn & nd
-    n4 -- Mounts on same file from\nDjango templates --> nb
-    n9 -.-> nn & n0
-    ni -- Provides a REST\nendpoint to manipulate\ndata from models --> ng
-    ng --> nd
-    n0 -- Consumes API Key\nto authenticate\nwith backend --> ng
-    nt -- Serves --> react_assets
-    nginx -- Serves --> subgraph_byfiey99u
-    nt -- Stores\ndata\non --> pg
-    style subgraph_byfiey99u stroke:#000000
-    style subgraph_3hmsyzvqm stroke:#000000
+```nginx
+location /dendrobium/ {
+    root /var/www;
+    try_files $uri $uri/ /dendrobium/index.html;
+}
+
+location /dendrobium/syntney/ {
+    alias /data/JBrowse2_MultiWay/;
+    index index.html;
+    try_files $uri $uri/ /index.html;
+}
 ```
 
-## Similar projects
+完整範例檔可參考：`config/nginx/dendrobium-path-routing.example.conf`
 
-React and Django are a great combination, and there are many projects out there that leverage the best of both worlds. Make sure to check them out if you're looking for a more opinionated boilerplate/different approach:
+---
 
-- [django-react-boilerplate](https://github.com/vintasoftware/django-react-boilerplate)
+## 目錄重點
+
+```text
+frontend/
+  lib/
+    api/            # 前端 API client
+    pages/          # 各功能頁面（home / analysis / transcriptome ...）
+    routes/         # React Router 路由定義
+    components/     # 共用元件
+  public/
+    dotplots/       # 物種對比 dotplot 圖
+    table/          # transcriptome counts 檔
+    species_tree.png
+```
+
+---
+
+## 備註
+
+- 本專案目前已從一般 boilerplate 擴充為石斛多物種比較平台，README 內容以現行功能為主。
+- 若新增物種、dotplot、或 transcriptome library，請同步更新前端資料與頁面選單設定。
