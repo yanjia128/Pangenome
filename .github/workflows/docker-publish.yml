@@ -15,7 +15,7 @@ on:
 
 env:
   # Change variable to your image's name.
-  IMAGE_NAME: Dendrobium-Pangenome
+  IMAGE_NAME: dendrobium-pangenome
 
 jobs:
   # Run tests.
@@ -51,7 +51,7 @@ jobs:
         run: docker build . --file Dockerfile --tag $IMAGE_NAME
 
       - name: Log into registry
-        run:           echo "${{ secrets.GITHUB_TOKEN }}" |
+        run: echo "${{ secrets.GITHUB_TOKEN }}" |
           docker login ghcr.io \
             -u "${{ github.actor }}" \
             --password-stdin
