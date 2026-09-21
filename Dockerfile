@@ -2,8 +2,8 @@
 FROM node:20
 WORKDIR /usr/src/app
 ARG AUTH_TOKEN
-ENV AUTH_TOKEN $AUTH_TOKEN
-ENV NODE_ENV production
+ENV AUTH_TOKEN =${AUTH_TOKEN}
+ENV NODE_ENV =production
 ADD ./frontend/ /usr/src/app/frontend/
 RUN npm install -g pnpm
 RUN cd frontend \
@@ -15,10 +15,10 @@ RUN cd frontend \
 FROM python:3.12-slim-bookworm
 WORKDIR /usr/src/app
 ARG ALLOWED_HOSTS
-ENV ALLOWED_HOSTS $ALLOWED_HOSTS
-ENV PYTHONDONTWRITEBYTECODE 0
-ENV PYTHONUNBUFFERED 0
-ENV MODE "production"
+ENV ALLOWED_HOSTS =${ALLOWED_HOSTS}
+ENV PYTHONDONTWRITEBYTECODE =1
+ENV PYTHONUNBUFFERED =1
+ENV MODE =production
 RUN apt-get update && \
     apt-get install --no-install-recommends -y build-essential postgresql-common libpq-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
